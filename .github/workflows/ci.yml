@@ -76,21 +76,23 @@ jobs:
         run: |
           set -euo pipefail
           echo "Xcode: $(xcodebuild -version | head -1)"
-          UDID=$(xcrun simctl list devices available -j > "$RUNNER_TEMP/devices.json"
-                 /usr/bin/python3 - "$RUNNER_TEMP/devices.json" <<'PY'
-          import json, sys
-          with open(sys.argv[1], encoding="utf-8") as handle:
-              devices = json.load(handle)["devices"]
-          for runtime in sorted(devices, reverse=True):
-              if "iOS" not in runtime:
-                  continue
-              for device in devices[runtime]:
-                  if device["name"].startswith("iPhone"):
-                      print(device["udid"])
-                      sys.exit(0)
-          sys.exit(1)
-          PY
-          )
+          # Имена и версии симуляторов на раннере меняются (iPhone 16/17,
+          # iOS 18/26), поэтому берём первый доступный iPhone старшей ОС.
+          xcrun simctl list devices available -j > "$RUNNER_TEMP/devices.json"
+          UDID=$(/usr/bin/python3 -c '
+import json, os, sys
+path = os.path.join(os.environ["RUNNER_TEMP"], "devices.json")
+with open(path, encoding="utf-8") as handle:
+    devices = json.load(handle)["devices"]
+for runtime in sorted(devices, reverse=True):
+    if "iOS" not in runtime:
+        continue
+    for device in devices[runtime]:
+        if device["name"].startswith("iPhone"):
+            print(device["udid"])
+            sys.exit(0)
+sys.exit(1)
+')
           echo "SIM_ID=$UDID" >> "$GITHUB_ENV"
           echo "Симулятор: $UDID"
 
