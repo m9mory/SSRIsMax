@@ -30,21 +30,32 @@ MaxClient/
 
 Tests/CoreTests.swift         XCTest: кодек, кадры, парсеры, репозитории
 Tools/max-core/               SwiftPM-CLI для проверки протокола без iPhone
+Tools/max-core/core-kit/      SwiftPM-пакет с офлайн-тестами ядра (для CI)
+.github/workflows/ci.yml      сборка и тесты на macOS-раннере
 docs/                         заметки по протоколу, сборке, миграциям
-scripts/sync-core.ps1|.sh     копирование ядра в CLI-пакет
+scripts/                      синхронизация ядра в CLI, упаковка .ipa
 project.yml                   спецификация XcodeGen
 ```
 
+Проект не хранит `.xcodeproj`: он генерируется из `project.yml`.
+
 ## Сборка
 
+Основной путь — GitHub Actions: на каждый push workflow `CI` прогоняет
+ядро через SwiftPM, генерирует проект XcodeGen и собирает приложение с
+тестами на симуляторе. Артефакт запуска — не подписанные `.app` и `.ipa`
+для установки на телефон.
+
 ```bash
-brew install xcodegen        # если ещё нет
+# локально то же самое
+brew install xcodegen
 xcodegen generate
 open MaxClient.xcodeproj     # ⌘R — на устройство или симулятор
 ```
 
-Минимум — iOS 16. Подпись: выберите Team в Signing & Capabilities.
-Сборку без XcodeGen и запуск тестов (⌘U) см. в [docs/BUILD.md](docs/BUILD.md).
+Минимум — iOS 16. Подпись — в вашем Xcode (Team в Signing &
+Capabilities), поэтому сертификаты в CI не нужны. Пошагово —
+[docs/FIRST-RUN.md](docs/FIRST-RUN.md), детали — [docs/BUILD.md](docs/BUILD.md).
 
 ## Как устроено
 
