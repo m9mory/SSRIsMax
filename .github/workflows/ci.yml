@@ -1,0 +1,134 @@
+name: CI
+
+# Сборка и тесты iOS-клиента на macOS-раннере GitHub Actions.
+# Артефакты (не подписанные .app и .ipa) остаются на странице запуска.
+# Подпись — только в вашем Xcode: сертификат и профиль в CI не нужны.
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  SCHEME: MaxClient
+  XCODEPROJ: MaxClient.xcodeproj
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Шаг 1. Ядро через SwiftPM: быстро, без подписи и без симулятора.
+  # Ловит ошибки протокола, кодека MessagePack и парсеров.
+  # ---------------------------------------------------------------------------
+  core:
+    name: Core (SwiftPM)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Версия Swift
+        run: swift --version
+
+      - name: Кеш SwiftPM
+        uses: actions/cache@v4
+        with:
+          path: |
+            Tools/max-core/.build
+            Tools/max-core/core-kit/.build
+          key: spm-${{ runner.os }}-${{ hashFiles('Tools/max-core/**') }}
+          restore-keys: spm-${{ runner.os }}-
+
+      - name: Ядро компилируется
+        working-directory: Tools/max-core
+        run: swift build
+
+      - name: Офлайн-тесты протокола
+        working-directory: Tools/max-core/core-kit
+        run: swift test
+
+  # ---------------------------------------------------------------------------
+  # Шаг 2. Настоящий iOS-проект: XcodeGen → сборка → тесты на симуляторе.
+  # Симулятор выбирается динамически: имена и версии на раннере меняются
+  # (iPhone 16 / iPhone 17, iOS 18 / iOS 26), жёстко задавать нельзя.
+  # ---------------------------------------------------------------------------
+  ios:
+    name: iOS build & tests
+    runs-on: macos-15
+    needs: core
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Зеркало ядра не отстало
+        run: |
+          chmod +x scripts/sync-core.sh scripts/make-ipa.sh
+          scripts/sync-core.sh --verify
+
+      - name: Установка XcodeGen
+        run: brew install xcodegen
+
+      - name: Генерация проекта
+        run: xcodegen generate
+
+      - name: Выбор симулятора
+        run: |
+          set -euo pipefail
+          echo "Xcode: $(xcodebuild -version | head -1)"
+          UDID=$(xcrun simctl list devices available -j > "$RUNNER_TEMP/devices.json"
+                 /usr/bin/python3 - "$RUNNER_TEMP/devices.json" <<'PY'
+          import json, sys
+          with open(sys.argv[1], encoding="utf-8") as handle:
+              devices = json.load(handle)["devices"]
+          for runtime in sorted(devices, reverse=True):
+              if "iOS" not in runtime:
+                  continue
+              for device in devices[runtime]:
+                  if device["name"].startswith("iPhone"):
+                      print(device["udid"])
+                      sys.exit(0)
+          sys.exit(1)
+          PY
+          )
+          echo "SIM_ID=$UDID" >> "$GITHUB_ENV"
+          echo "Симулятор: $UDID"
+
+      - name: Кеш Swift-пакетов Xcode
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Developer/Xcode/DerivedData/**/SourcePackages
+            ~/Library/Caches/org.swift.swiftpm
+          key: xcode-spm-${{ hashFiles('project.yml') }}
+          restore-keys: xcode-spm-
+
+      - name: Сборка для симулятора
+        run: |
+          set -o pipefail
+          xcodebuild -project "$XCODEPROJ" -scheme "$SCHEME" \
+            -configuration Debug -destination "id=$SIM_ID" \
+            -derivedDataPath build CODE_SIGNING_ALLOWED=NO build
+
+      - name: Тесты
+        run: |
+          set -o pipefail
+          xcodebuild -project "$XCODEPROJ" -scheme "$SCHEME" \
+            -destination "id=$SIM_ID" \
+            -derivedDataPath build CODE_SIGNING_ALLOWED=NO test
+
+      - name: Не подписанные .app и .ipa
+        run: |
+          set -euo pipefail
+          APP=$(find build/Build/Products/Debug-iphonesimulator -maxdepth 1 -name "*.app" | head -1)
+          test -n "$APP"
+          mkdir -p artifacts
+          cp -R "$APP" artifacts/
+          scripts/make-ipa.sh "$APP" artifacts/MAX-unsigned.ipa
+
+      - name: Артефакты
+        uses: actions/upload-artifact@v4
+        with:
+          name: MAX-debug-${{ github.sha }}
+          path: artifacts/
+          if-no-files-found: error
