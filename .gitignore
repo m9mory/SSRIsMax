@@ -1,0 +1,24 @@
+# macOS / Xcode
+.DS_Store
+build/
+Build/
+DerivedData/
+xcuserdata/
+
+# Проект генерируется XcodeGen из project.yml — в репозитории не нужен.
+*.xcodeproj
+*.xcworkspace
+
+# Swift Package Manager
+.build/
+.swiftpm/
+Package.resolved
+
+# Артефакты локальной сборки и CI
+artifacts/
+*.ipa
+*.dSYM.zip
+
+# Логи и временные файлы
+*.log
+*.tmp
