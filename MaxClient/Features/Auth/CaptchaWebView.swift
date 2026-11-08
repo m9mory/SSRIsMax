@@ -69,7 +69,11 @@ struct CaptchaWebView: UIViewRepresentable {
               // и жадный предфильтр отбрасывал бы верный ответ.
               var lower = String(text).toLowerCase();
               if (lower.indexOf('token') < 0) { return; }
-              var re = /"(?:captcha_?[Tt]oken|token)"\s*:\s*"([^"]{8,})"/;
+              // Регулярка собирается из строк: обратный слэш в Swift-
+              // литерале пришлось бы экранировать, и легко получить
+              // невалидную последовательность. Здесь его нет вовсе.
+              var ws = "[" + String.fromCharCode(32) + String.fromCharCode(9) + String.fromCharCode(10) + String.fromCharCode(13) + "]*";
+              var re = new RegExp('"(?:captcha_?[Tt]oken|token)"' + ws + ":" + ws + '"([^"]{8,})"');
               var m = text.match(re);
               if (m) { window.__ssrismaxCaptchaToken = m[1]; }
             } catch (err) {}
