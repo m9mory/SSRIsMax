@@ -68,7 +68,7 @@ xcodebuild -project MaxClient.xcodeproj -scheme MaxClient \
   -derivedDataPath build-device build
 ```
 
-Дальше `scripts/make-ipa.sh <путь к MAX.app> MAX-unsigned.ipa`.
+Дальше `scripts/make-ipa.sh <путь к SSRIsMax.app> SSRIsMax-unsigned.ipa`.
 Скрипт принимает и относительные пути: он делает их абсолютными сам,
 до перехода во временный каталог.
 

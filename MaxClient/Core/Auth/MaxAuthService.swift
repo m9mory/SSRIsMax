@@ -35,7 +35,7 @@ public actor MaxAuthService {
     public func initialize() async throws {
         guard !initialized else { return }
         let frame = MaxFrame(command: 0,
-                             sequence: 1,
+                             sequence: transport.nextSeq(),
                              opcode: MaxOpcode.initSession.rawValue,
                              payload: MaxRequests.initSession(deviceID: store.deviceID, userAgent: userAgent))
         _ = try await transport.request(frame, timeout: MaxProtocol.requestTimeout)
@@ -48,7 +48,7 @@ public actor MaxAuthService {
     public func requestCode(phone: String, isResend: Bool = false, captchaToken: String? = nil) async throws -> PhoneVerification {
         try await initialize()
         let frame = MaxFrame(command: 0,
-                             sequence: 2,
+                             sequence: transport.nextSeq(),
                              opcode: MaxOpcode.verificationRequest.rawValue,
                              payload: MaxRequests.requestCode(phone: phone,
                                                               type: isResend ? "RESEND" : "START_AUTH",
@@ -78,7 +78,7 @@ public actor MaxAuthService {
     public func confirmCode(token: String, code: String) async throws -> String {
         try await initialize()
         let frame = MaxFrame(command: 0,
-                             sequence: 3,
+                             sequence: transport.nextSeq(),
                              opcode: MaxOpcode.codeEnter.rawValue,
                              payload: MaxRequests.enterCode(token: token, code: code))
         let response: MaxFrame
@@ -120,7 +120,7 @@ public actor MaxAuthService {
         }
 
         let frame = MaxFrame(command: 0,
-                             sequence: 4,
+                             sequence: transport.nextSeq(),
                              opcode: MaxOpcode.login.rawValue,
                              payload: MaxRequests.login(token: sessionToken))
         let response: MaxFrame

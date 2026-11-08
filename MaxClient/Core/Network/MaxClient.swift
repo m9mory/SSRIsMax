@@ -30,7 +30,6 @@ public actor MaxClient {
     private let transport: MaxTransporting
     private let store: MaxCredentialStore
     private let userAgent: MaxRequests.UserAgent
-    private let pump = MaxFramePump()
 
     private var state: ConnectionState = .idle
     private var updateContinuations: [UUID: AsyncStream<Update>.Continuation] = [:]
@@ -139,7 +138,7 @@ public actor MaxClient {
     private func sendPing() async {
         do {
             let frame = MaxFrame(command: 0,
-                                 sequence: pump.nextSeq(),
+                                 sequence: transport.nextSeq(),
                                  opcode: MaxOpcode.ping.rawValue,
                                  payload: MPValue(["interactive": .bool(true)]))
             try await transport.send(frame: frame)
@@ -151,7 +150,11 @@ public actor MaxClient {
     // MARK: - Универсальный запрос
 
     private func perform(_ opcode: MaxOpcode, payload: MPValue, timeout: TimeInterval = MaxProtocol.requestTimeout) async throws -> MPValue {
-        let frame = MaxFrame(command: 0, sequence: pump.nextSeq(), opcode: opcode.rawValue, payload: payload)
+        // seq берётся у транспорта, а не у своей переменной: ответы
+        // разбираются по seq внутри транспорта, и второй независимый
+        // счётчик с тем же началом гарантированно давал бы коллизии с
+        // запросами авторизации.
+        let frame = MaxFrame(command: 0, sequence: transport.nextSeq(), opcode: opcode.rawValue, payload: payload)
         let response = try await transport.request(frame, timeout: timeout)
         return response.payload
     }

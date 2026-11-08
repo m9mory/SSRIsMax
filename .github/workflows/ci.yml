@@ -1,14 +1,19 @@
 name: CI
 
-# Сборка и тесты iOS-клиента на macOS-раннере GitHub Actions.
-# Артефакты (не подписанные .app и .ipa) остаются на странице запуска.
-# Подпись — только в вашем Xcode: сертификат и профиль в CI не нужны.
+# Сборка и тесты клиента на macOS-раннере GitHub Actions.
+# Каждый успешный прогон main публикует не подписанный .ipa в Releases.
+# Подпись — только в вашем Xcode или инструментом сайдлоада:
+# сертификат и профиль в CI не нужны.
 
 on:
   push:
     branches: [main, master]
   pull_request:
   workflow_dispatch:
+
+# По умолчанию у GITHUB_TOKEN только чтение; для gh release нужна запись.
+permissions:
+  contents: write
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -124,14 +129,14 @@ jobs:
             CODE_SIGN_IDENTITY="" EXPANDED_CODE_SIGN_IDENTITY="" \
             build
 
-      - name: Не подписанные .app и .ipa
+      - name: Сборка не подписанного .ipa
         run: |
           set -euo pipefail
           APP=$(find build-device/Build/Products/Release-iphoneos -maxdepth 1 -name "*.app" | head -1)
           test -n "$APP"
           echo "Приложение: $APP"
           # Убеждаемся, что это сборка под устройство, а не под симулятор:
-          # иначе в артефакт уедет нерабочий бандл.
+          # иначе в релиз уедет нерабочий пакет.
           BIN="$APP/$(basename "$APP" .app)"
           if ! lipo -info "$BIN" | grep -Eq 'arm64'; then
             echo "Неожиданная архитектура бинарника: $(lipo -info "$BIN")" >&2
@@ -142,12 +147,42 @@ jobs:
             exit 1
           fi
           mkdir -p artifacts
-          cp -R "$APP" artifacts/
-          scripts/make-ipa.sh "$APP" artifacts/MAX-unsigned.ipa
+          # В релиз уходит только .ipa: .app разворачивается из исходников.
+          scripts/make-ipa.sh "$APP" artifacts/SSRIsMax-unsigned.ipa
+          ls -lh artifacts
 
-      - name: Артефакты
-        uses: actions/upload-artifact@v4
-        with:
-          name: MAX-unsigned-${{ github.sha }}
-          path: artifacts/
-          if-no-files-found: error
+      # Тег вида v0.1.0-<short sha> на каждый успешный прогон main.
+      # Релиз создаётся/обновляется по этому тегу.
+      - name: Публикация релиза
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          VERSION=$(grep -o 'MARKETING_VERSION: "[^"]*"' project.yml | head -1 | sed -E 's/.*"([^"]*)".*/\1/')
+          VERSION=${VERSION:-0.0.0}
+          SHORT=$(echo "${GITHUB_SHA}" | cut -c1-7)
+          TAG="v${VERSION}-${SHORT}"
+          echo "Тег релиза: $TAG"
+
+          # Заметки к релизу собираются printf, а не heredoc: пустые строки
+          # внутри YAML-блока «run: |» обнуляют отступ и ломают разбор.
+          NOTES=$(printf '%s\n' \
+            'Не подписанный .ipa неофициального клиента MAX.' \
+            '' \
+            'Установка: Sideloadly / SideStore / AltStore (подпись вашим Apple ID) или TrollStore на iOS 14.0–17.0.' \
+            '' \
+            "- Версия: ${VERSION}" \
+            "- Коммит: ${GITHUB_SHA}" \
+            '- Собран в GitHub Actions из исходников этого репозитория.')
+
+          # Повторный прогон того же коммита — просто перезаписываем файл.
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" artifacts/SSRIsMax-unsigned.ipa \
+              --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$TAG" artifacts/SSRIsMax-unsigned.ipa \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "SSRIsMax ${VERSION} (${SHORT})" \
+              --notes "$NOTES"
+          fi

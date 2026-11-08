@@ -79,6 +79,13 @@ public final class MaxTCPTransport: MaxTransporting, @unchecked Sendable {
         }
     }
 
+    /// У TCP-транспорта seq уходит одним байтом в заголовке, поэтому
+    /// берём значение из pump и сразу приводим к байту — так же, как это
+    /// делает таблица ожиданий в request(_:timeout:).
+    public func nextSeq() -> Int {
+        pump.nextSeq() % 256
+    }
+
     public func request(_ frame: MaxFrame, timeout: TimeInterval) async throws -> MaxFrame {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<MaxFrame, Error>) in
             pump.registerAwaiting(frame.sequence % 256, continuation: continuation)

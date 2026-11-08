@@ -60,7 +60,7 @@ struct ChatListView: View {
         .refreshable {
             await session.pullChats()
         }
-        .navigationTitle("MAX")
+        .navigationTitle("SSRIsMax")
         .navigationDestination(for: Route.self) { route in
             switch route {
             case .chat(let id):

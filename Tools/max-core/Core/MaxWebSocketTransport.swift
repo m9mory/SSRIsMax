@@ -72,6 +72,10 @@ public final class MaxWebSocketTransport: MaxTransporting, @unchecked Sendable {
         }
     }
 
+    public func nextSeq() -> Int {
+        pump.nextSeq()
+    }
+
     public func disconnect() {
         lock.lock()
         let task = self.task

@@ -114,15 +114,24 @@ public final class Session: ObservableObject {
         PhoneFormatter.normalize(raw) ?? "+" + raw.filter(\.isNumber)
     }
 
-    public func requestCode(isResend: Bool = false) async {
+    /// Отправляет SMS с кодом.
+    ///
+    /// `phone` передаётся из поля ввода явно: экран держит своё
+    /// состояние, а `auth.phone` — это уже нормализованный номер для
+    /// показа («Код отправлен на …»). Раньше здесь читался `auth.phone`,
+    /// который до первого успешного запроса пуст, поэтому кнопка всегда
+    /// упиралась в проверку формата.
+    public func requestCode(phone rawPhone: String? = nil, isResend: Bool = false) async {
         auth.errorMessage = nil
-        auth.isLoading = true
-        defer { auth.isLoading = false }
 
-        guard let phone = PhoneFormatter.normalize(auth.phone) else {
+        let source = rawPhone ?? auth.phone
+        guard let phone = PhoneFormatter.normalize(source) else {
             auth.errorMessage = "Введите номер в формате +7 999 123-45-67"
             return
         }
+
+        auth.isLoading = true
+        defer { auth.isLoading = false }
         auth.phone = phone
 
         do {

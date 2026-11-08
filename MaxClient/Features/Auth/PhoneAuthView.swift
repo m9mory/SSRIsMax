@@ -40,7 +40,7 @@ struct PhoneAuthView: View {
                 }
 
                 Button {
-                    Task { await session.requestCode() }
+                    Task { await session.requestCode(phone: phone) }
                 } label: {
                     HStack {
                         if session.auth.isLoading {
@@ -169,7 +169,7 @@ struct CodeEntryView: View {
                 .opacity(code.count < session.auth.codeLength ? 0.5 : 1)
 
                 Button {
-                    Task { await session.requestCode(isResend: true) }
+                    Task { await session.requestCode(phone: session.auth.phone, isResend: true) }
                 } label: {
                     if session.auth.resendAvailableIn > 0 {
                         Text("Отправить снова через \(session.auth.resendAvailableIn) с")

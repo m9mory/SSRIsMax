@@ -46,10 +46,10 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: ru.maxclient.app
-        PRODUCT_NAME: MAX
-        # Продукт называется MAX, но модуль — MaxClient: от PRODUCT_NAME
+        PRODUCT_NAME: SSRIsMax
+        # Продукт называется SSRIsMax, но модуль — MaxClient: от PRODUCT_NAME
         # Swift берёт имя модуля, и `@testable import MaxClient` в тестах
-        # падал бы с "no such module MAX". Явно фиксируем имя модуля.
+        # падал бы с "no such module SSRIsMax". Явно фиксируем имя модуля.
         PRODUCT_MODULE_NAME: MaxClient
         INFOPLIST_FILE: MaxClient/Resources/Info.plist
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
@@ -74,7 +74,7 @@ targets:
         # XcodeGen выводит TEST_HOST из имени таргета (MaxClient), но
         # продукт приложения называется MAX.app/MAX. Без явного пути
         # xcodebuild падает с "Could not find test host for MaxCoreTests".
-        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/MAX.app/MAX"
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/SSRIsMax.app/SSRIsMax"
         BUNDLE_LOADER: "$(TEST_HOST)"
 
 schemes:

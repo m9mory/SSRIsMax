@@ -50,6 +50,14 @@ public protocol MaxTransporting: AnyObject {
     /// уходят в `onEvent`.
     func request(_ frame: MaxFrame, timeout: TimeInterval) async throws -> MaxFrame
     func disconnect()
+
+    /// Следующий свободный seq.
+    ///
+    /// Каждый новый запрос ОБЯЗАН брать seq отсюда и никогда не задавать
+    /// номер константой: ответы разбираются по seq, и два запроса с
+    /// одинаковым номером перетирают друг друга в таблице ожиданий —
+    /// первый висит до таймаута, второй получает чужой ответ.
+    func nextSeq() -> Int
 }
 
 // MARK: - События сервера

@@ -40,12 +40,12 @@ git push -u origin main
 
 ## 3. Установка на iPhone
 
-1. Скачать артефакт `MAX-unsigned-<sha>` из последнего успешного запуска
-   (внутри — `.app` для устройства и `MAX-unsigned.ipa`).
+1. Открыть вкладку **Releases** репозитория и скачать
+   `SSRIsMax-unsigned.ipa` из последнего релиза (тег `v<версия>-<sha>`).
 2. Вариант А (с Mac): `open MaxClient.xcodeproj`, выбрать Team,
    ⌘R на подключённый телефон. Через 7 дней — снова ⌘R
    (или год, если аккаунт разработчика платный).
-3. Вариант Б (без Mac): `MAX-unsigned.ipa` → Sideloadly / SideStore /
+3. Вариант Б (без Mac): `SSRIsMax-unsigned.ipa` → Sideloadly / SideStore /
    AltStore, подпись вашим Apple ID на устройстве.
 4. Вариант В (iOS 14.0–17.0): TrollStore — установка неподписанного
    IPA навсегда, без переподписи.
