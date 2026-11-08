@@ -17,6 +17,13 @@ if [[ ! -d "$APP" ]]; then
     exit 1
 fi
 
+# Оба пути делаются абсолютными ДО смены каталога: ниже мы заходим в
+# временный каталог, и относительный IPA резолвился бы внутри него,
+# из-за чего zip падал с "No such file or directory".
+APP="$(cd "$(dirname "$APP")" && pwd)/$(basename "$APP")"
+mkdir -p "$(dirname "$IPA")"
+IPA="$(cd "$(dirname "$IPA")" && pwd)/$(basename "$IPA")"
+
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 

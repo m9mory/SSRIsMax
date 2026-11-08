@@ -59,5 +59,16 @@ xcodebuild -project MaxClient.xcodeproj -scheme MaxClient \
   CODE_SIGNING_ALLOWED=NO build
 ```
 
-Дальше `scripts/make-ipa.sh <App.app> MAX-unsigned.ipa`.
+Для `.ipa` нужна сборка под устройство, а не под симулятор:
+
+```bash
+xcodebuild -project MaxClient.xcodeproj -scheme MaxClient \
+  -configuration Release -destination 'generic/platform=iOS' \
+  CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+  -derivedDataPath build-device build
+```
+
+Дальше `scripts/make-ipa.sh <путь к MAX.app> MAX-unsigned.ipa`.
+Скрипт принимает и относительные пути: он делает их абсолютными сам,
+до перехода во временный каталог.
 

@@ -110,11 +110,37 @@ jobs:
             -destination "id=$SIM_ID" \
             -derivedDataPath build CODE_SIGNING_ALLOWED=NO test
 
+      # Симуляторный .app не годится для сайдлоада: другая платформа и
+      # архитектура. Для .ipa нужна сборка под устройство (iphoneos) без
+      # подписи — подписывает уже SideStore/AltStore/Sideloadly.
+      - name: Сборка под устройство (для .ipa)
+        run: |
+          set -o pipefail
+          xcodebuild -project "$XCODEPROJ" -scheme "$SCHEME" \
+            -configuration Release \
+            -destination "generic/platform=iOS" \
+            -derivedDataPath build-device \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" EXPANDED_CODE_SIGN_IDENTITY="" \
+            build
+
       - name: Не подписанные .app и .ipa
         run: |
           set -euo pipefail
-          APP=$(find build/Build/Products/Debug-iphonesimulator -maxdepth 1 -name "*.app" | head -1)
+          APP=$(find build-device/Build/Products/Release-iphoneos -maxdepth 1 -name "*.app" | head -1)
           test -n "$APP"
+          echo "Приложение: $APP"
+          # Убеждаемся, что это сборка под устройство, а не под симулятор:
+          # иначе в артефакт уедет нерабочий бандл.
+          BIN="$APP/$(basename "$APP" .app)"
+          if ! lipo -info "$BIN" | grep -Eq 'arm64'; then
+            echo "Неожиданная архитектура бинарника: $(lipo -info "$BIN")" >&2
+            exit 1
+          fi
+          if lipo -info "$BIN" | grep -Eq 'x86_64'; then
+            echo "Это симбинарник для симулятора, а не для устройства" >&2
+            exit 1
+          fi
           mkdir -p artifacts
           cp -R "$APP" artifacts/
           scripts/make-ipa.sh "$APP" artifacts/MAX-unsigned.ipa
@@ -122,6 +148,6 @@ jobs:
       - name: Артефакты
         uses: actions/upload-artifact@v4
         with:
-          name: MAX-debug-${{ github.sha }}
+          name: MAX-unsigned-${{ github.sha }}
           path: artifacts/
           if-no-files-found: error
