@@ -9,10 +9,15 @@ import PackageDescription
 // «target 'MaxCore' is outside the package root». Поэтому ядро и тесты
 // живут в одном пакете, а CLI-цель отдельная.
 //
-// Внимание: порядок аргументов в PackageDescription фиксирован —
-// `exclude` обязан идти ДО `sources`, иначе манифест не компилируется.
-//
 // Core/ — зеркало MaxClient/Core, обновляется scripts/sync-core.sh|ps1.
+//
+// ВАЖНО о порядке аргументов. В PackageDescription это не свободный вызов,
+// а фиксированный список параметров, и компилятор манифеста проверяет его
+// буквально. Порядок для target/executableTarget/testTarget:
+//
+//     name → dependencies → path → exclude → sources → resources → ...
+//
+// Нарушение даёт «argument 'X' must precede argument 'Y'» и «Invalid manifest».
 
 let package = Package(
     name: "max-core",
@@ -31,17 +36,17 @@ let package = Package(
         // Зависит от ядра, чтобы типы были в одном модуле проекта.
         .executableTarget(
             name: "max-core",
+            dependencies: ["MaxCore"],
             path: ".",
-            exclude: ["Core", "core-kit"],
-            sources: ["main.swift"],
-            dependencies: ["MaxCore"]
+            exclude: ["Core"],
+            sources: ["main.swift"]
         ),
         // Офлайн-тесты: XCTest рядом с ядром, без CLI-цели
         // (у main.swift верхнеуровневый код, несовместимый с тестами).
         .testTarget(
             name: "MaxCoreTests",
-            path: "Tests",
-            dependencies: ["MaxCore"]
+            dependencies: ["MaxCore"],
+            path: "Tests"
         )
     ]
 )
