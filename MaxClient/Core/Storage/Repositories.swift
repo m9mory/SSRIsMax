@@ -127,16 +127,21 @@ struct MessageRecord: Codable, FetchableRecord, PersistableRecord, TableRecord {
     }
 
     var domain: MaxMessage {
-        MaxMessage(id: id,
-                   chatID: chatId,
-                   senderID: senderId,
-                   text: text,
-                   timestamp: timestamp,
-                   elements: (JSONColumns.decode(elementsJSON) ?? []).map(\.domain),
-                   attachments: (JSONColumns.decode(attachesJSON) ?? []).map(\.domain),
-                   reactions: JSONColumns.decode(reactionsJSON)?.domain,
-                   cid: cid,
-                   status: MaxMessageStatus(rawValue: status) ?? .sent)
+        // Тип для decode выводится из аннотации, а не из ?? [] —
+        // иначе компилятор не может определить T и корень key-path.
+        let elements: [ElementDTO] = JSONColumns.decode(elementsJSON) ?? []
+        let attachments: [AttachmentDTO] = JSONColumns.decode(attachesJSON) ?? []
+        let reactions: ReactionDTO? = JSONColumns.decode(reactionsJSON)
+        return MaxMessage(id: id,
+                          chatID: chatId,
+                          senderID: senderId,
+                          text: text,
+                          timestamp: timestamp,
+                          elements: elements.map(\.domain),
+                          attachments: attachments.map(\.domain),
+                          reactions: reactions?.domain,
+                          cid: cid,
+                          status: MaxMessageStatus(rawValue: status) ?? .sent)
     }
 }
 

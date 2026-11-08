@@ -71,7 +71,14 @@ public enum MaxParser {
             ?? string(value["phoneNumber"])
 
         let avatar = url(value["picture"]?["url"]) ?? url(value["baseIconUrl"])
-        let botFlag = int64(value["isBot"]).map { $0 != 0 } ?? (value["isBot"]?.bool ?? false)
+        // Правая часть ?? тоже Bool?, поэтому результат был Bool? и не
+        // подходил под isBot: Bool. Сводим число и булево в явный Bool.
+        let botFlag: Bool
+        if let number = int64(value["isBot"]) {
+            botFlag = number != 0
+        } else {
+            botFlag = value["isBot"]?.bool ?? false
+        }
 
         return MaxUser(id: id,
                        firstName: firstName,

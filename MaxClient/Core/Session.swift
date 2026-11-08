@@ -319,8 +319,10 @@ public final class Session: ObservableObject {
         }
     }
 
+    /// `client` — actor, поэтому вызов из @MainActor обязан быть async.
+    /// Набор текста — fire-and-forget: UI не ждёт подтверждения.
     public func sendTyping(chatID: MaxChatID) {
-        client.sendTyping(chatID: chatID)
+        Task { await client.sendTyping(chatID: chatID) }
     }
 
     public func deleteMessage(_ message: MaxMessage, in chatID: MaxChatID) async {
@@ -338,15 +340,17 @@ public final class Session: ObservableObject {
         let last = try? messageRepository.latest(chatID: chatID)
         try? chatRepository.resetUnread(chatID: chatID)
         if settings.settings.sendReadReceipts, let last {
-            client.markRead(chatID: chatID, messageID: last.id, mark: last.timestamp)
+            await client.markRead(chatID: chatID, messageID: last.id, mark: last.timestamp)
         }
         await refreshChats()
     }
 
     public func markRead(chatID: MaxChatID, message: MaxMessage) {
         guard settings.settings.sendReadReceipts else { return }
-        client.markRead(chatID: chatID, messageID: message.id, mark: message.timestamp)
         try? chatRepository.resetUnread(chatID: chatID)
+        let id = message.id
+        let mark = message.timestamp
+        Task { await client.markRead(chatID: chatID, messageID: id, mark: mark) }
     }
 
     public func react(chatID: MaxChatID, messageID: MaxMessageID, emoji: String) async {
