@@ -13,6 +13,9 @@ import PackageDescription
 // `main.swift` ссылался на несуществующие типы (ошибки вида
 // «cannot find 'nowMillis' in scope» и «MPValue has no accessible
 // initializers» при том, что код был на месте).
+//
+// Внимание: порядок аргументов в PackageDescription фиксирован —
+// `exclude` обязан идти ДО `sources`, иначе манифест не компилируется.
 
 let package = Package(
     name: "max-core",
@@ -24,8 +27,8 @@ let package = Package(
         .executableTarget(
             name: "max-core",
             path: ".",
-            sources: ["Core", "main.swift"],
-            exclude: ["core-kit"]
+            exclude: ["core-kit"],
+            sources: ["Core", "main.swift"]
         )
     ]
 )
