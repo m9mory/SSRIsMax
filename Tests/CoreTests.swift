@@ -179,6 +179,75 @@ final class PhoneFormatterTests: XCTestCase {
     }
 }
 
+/// Мультиплексирование ответов по seq — самое хрупкое место транспорта.
+/// Проверяется без сети: «ответы» подаются прямо в pump.
+final class FramePumpTests: XCTestCase {
+    func testResponseGoesToMatchingRequest() async throws {
+        let pump = MaxFramePump()
+        let first = pump.nextSeq()
+        let second = pump.nextSeq()
+
+        let firstResponse = Task<MaxFrame, Error> {
+            try await withCheckedThrowingContinuation { continuation in
+                pump.registerAwaiting(first, continuation: continuation)
+            }
+        }
+        let secondResponse = Task<MaxFrame, Error> {
+            try await withCheckedThrowingContinuation { continuation in
+                pump.registerAwaiting(second, continuation: continuation)
+            }
+        }
+
+        await pump.waitUntilPending(2, timeout: 1)
+        pump.completing(second, frame: MaxFrame(command: 1, sequence: second,
+                                               opcode: MaxOpcode.getChats.rawValue))
+        pump.completing(first, frame: MaxFrame(command: 1, sequence: first,
+                                              opcode: MaxOpcode.getHistory.rawValue))
+
+        let a = try await firstResponse.value
+        let b = try await secondResponse.value
+        XCTAssertEqual(a.opcode, MaxOpcode.getHistory.rawValue)
+        XCTAssertEqual(b.opcode, MaxOpcode.getChats.rawValue)
+    }
+
+    func testTimeoutFailsOnlyItsRequest() async {
+        let pump = MaxFramePump()
+        let slow = pump.nextSeq()
+        let fast = pump.nextSeq()
+
+        let slowTask = Task<MaxFrame, Error> {
+            try await withCheckedThrowingContinuation { continuation in
+                pump.registerAwaiting(slow, continuation: continuation)
+                pump.failLater(seq: slow, after: 0.05, error: MaxTransportError.timedOut(opcode: 49))
+            }
+        }
+        let fastTask = Task<MaxFrame, Error> {
+            try await withCheckedThrowingContinuation { continuation in
+                pump.registerAwaiting(fast, continuation: continuation)
+            }
+        }
+
+        await pump.waitUntilPending(2, timeout: 1)
+        pump.completing(fast, frame: MaxFrame(command: 1, sequence: fast,
+                                              opcode: MaxOpcode.getChats.rawValue))
+
+        do {
+            _ = try await fastTask.value
+        } catch {
+            XCTFail("быстрый запрос не должен упасть: \(error)")
+        }
+
+        do {
+            _ = try await slowTask.value
+            XCTFail("должен был сработать таймаут")
+        } catch let error as MaxTransportError {
+            XCTAssertEqual(error, .timedOut(opcode: 49))
+        } catch {
+            XCTFail("неожиданная ошибка: \(error)")
+        }
+    }
+}
+
 final class RepositoryTests: XCTestCase {
     private var queue: DatabaseQueue!
 

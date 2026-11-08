@@ -130,6 +130,26 @@ public final class MaxFramePump: @unchecked Sendable {
     }
 }
 
+// MARK: - Наблюдение за состоянием (для тестов)
+
+public extension MaxFramePump {
+    /// Сколько запросов сейчас ждут ответа.
+    var pendingCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return pending.count
+    }
+
+    /// Ждёт, пока накопится `count` ожидающих запросов. Задача тестов:
+    /// позволяет проверить мультиплексирование без гонок по времени.
+    func waitUntilPending(_ count: Int, timeout: TimeInterval) async {
+        let deadline = Date().addingTimeInterval(timeout)
+        while pendingCount < count && Date() < deadline {
+            try? await Task.sleep(nanoseconds: 5_000_000)
+        }
+    }
+}
+
 public enum MaxEventMapper {
     public static func map(frame: MaxFrame) -> MaxClientEvent {
         let payload = frame.payload
