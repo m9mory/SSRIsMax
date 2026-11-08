@@ -272,6 +272,22 @@ struct CaptchaWebView: UIViewRepresentable {
                 var roots = document.querySelectorAll('[data-test-id="captcha-widget"]');
                 out.push('widget=' + roots.length);
                 out.push('body=' + (document.body ? document.body.children.length : -1));
+                if (document.body) {
+                  for (var j = 0; j < document.body.children.length; j++) {
+                    var ch = document.body.children[j];
+                    out.push('  <' + ch.tagName + ' id=' + (ch.id || '-') +
+                             ' cls=' + String(ch.className || '-').slice(0, 30) +
+                             ' kids=' + ch.children.length + '>');
+                  }
+                }
+                var all = document.querySelectorAll('*');
+                out.push('nodes=' + all.length);
+                try {
+                  out.push('vk=' + (window.vk ? Object.keys(window.vk).slice(0, 6).join(',') : 'нет'));
+                } catch (e3) {}
+                try {
+                  out.push('obs=' + (window._vkObserverChallenge ? 'есть' : 'нет'));
+                } catch (e4) {}
               } catch (e) { out.push('err=' + e.message); }
               var log = window.__ssrismaxCaptchaLog || '';
               if (log) { out.push('--- log ---'); out.push(log); }
