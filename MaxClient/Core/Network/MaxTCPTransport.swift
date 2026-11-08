@@ -184,7 +184,7 @@ public final class MaxTCPTransport: MaxTransporting, @unchecked Sendable {
 
     // MARK: Кадры
 
-    static func pack(_ frame: MaxFrame) -> Data {
+    public static func pack(_ frame: MaxFrame) -> Data {
         var binary = frame
         binary.version = MaxProtocol.binaryVersion
         binary.sequence = binary.sequence % 256
@@ -208,7 +208,7 @@ public final class MaxTCPTransport: MaxTransporting, @unchecked Sendable {
     }
 
     /// Сервер иногда добавляет 1–2 leading int (fixedint) перед массивом.
-    static func decodePayload(_ body: Data) throws -> MPValue {
+    public static func decodePayload(_ body: Data) throws -> MPValue {
         let bytes = [UInt8](body)
         var start = 0
         while start < min(2, bytes.count), bytes[start] <= 0x7f {
