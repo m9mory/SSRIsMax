@@ -256,7 +256,7 @@ public enum MaxRequests {
         }
 
         public var payload: MPValue {
-            [
+            MPValue([
                 "deviceType": .string(deviceType),
                 "pushDeviceType": .string(pushDeviceType),
                 "locale": .string(locale),
@@ -267,12 +267,12 @@ public enum MaxRequests {
                 "appVersion": .string(appVersion),
                 "screen": .string(screen),
                 "timezone": .string(timezone)
-            ]
+            ])
         }
     }
 
     public static func initSession(deviceID: String, userAgent: UserAgent) -> MPValue {
-        ["deviceId": .string(deviceID), "userAgent": userAgent.payload]
+        MPValue(["deviceId": .string(deviceID), "userAgent": userAgent.payload])
     }
 
     public static func requestCode(phone: String, type: String = "START_AUTH", captchaToken: String? = nil) -> MPValue {
@@ -286,15 +286,15 @@ public enum MaxRequests {
     }
 
     public static func enterCode(token: String, code: String) -> MPValue {
-        [
+        MPValue([
             "token": .string(token),
             "verifyCode": .string(code),
             "authTokenType": .string("CHECK_CODE")
-        ]
+        ])
     }
 
     public static func login(token: String, chatsCount: Int = MaxProtocol.loginChatsCount) -> MPValue {
-        [
+        MPValue([
             "token": .string(token),
             "interactive": .bool(true),
             "chatsCount": .int(Int64(chatsCount)),
@@ -302,15 +302,15 @@ public enum MaxRequests {
             "contactsSync": .int(0),
             "presenceSync": .int(0),
             "draftsSync": .int(0)
-        ]
+        ])
     }
 
     public static func chats(count: Int = 100, marker: UnixMillis = nowMillis()) -> MPValue {
-        ["count": .int(Int64(count)), "marker": .int(marker)]
+        MPValue(["count": .int(Int64(count)), "marker": .int(marker)])
     }
 
     public static func history(chatID: MaxChatID, backward: Int = 50, forward: Int = 0, from: UnixMillis) -> MPValue {
-        [
+        MPValue([
             "chatId": .int(chatID),
             "backward": .int(Int64(backward)),
             "forward": .int(Int64(forward)),
@@ -320,81 +320,81 @@ public enum MaxRequests {
             "getMessages": .bool(true),
             "from": .int(from),
             "interactive": .bool(false)
-        ]
+        ])
     }
 
     public static func sendMessage(chatID: MaxChatID, text: String, cid: Int64, attachments: [MPValue] = []) -> MPValue {
-        [
+        MPValue([
             "chatId": .int(chatID),
             "notify": .bool(true),
-            "message": [
+            "message": MPValue([
                 "text": .string(text),
                 "cid": .int(cid),
                 "elements": .array([]),
                 "attaches": .array(attachments)
-            ]
-        ]
+            ])
+        ])
     }
 
     public static func typing(chatID: MaxChatID) -> MPValue {
-        ["chatId": .int(chatID)]
+        MPValue(["chatId": .int(chatID)])
     }
 
     public static func markRead(chatID: MaxChatID, messageID: MaxMessageID, mark: UnixMillis) -> MPValue {
-        [
+        MPValue([
             "type": .string("READ_MESSAGE"),
             "chatId": .int(chatID),
             "messageId": .string(messageID),
             "mark": .int(mark)
-        ]
+        ])
     }
 
     public static func subscribe(chatID: MaxChatID, subscribe: Bool = true) -> MPValue {
-        ["chatId": .int(chatID), "subscribe": .bool(subscribe)]
+        MPValue(["chatId": .int(chatID), "subscribe": .bool(subscribe)])
     }
 
     public static func chatInfo(chatID: MaxChatID) -> MPValue {
-        ["chatId": .int(chatID)]
+        MPValue(["chatId": .int(chatID)])
     }
 
     public static func chatBulk(ids: [MaxChatID]) -> MPValue {
-        ["chatIds": .array(ids.map { .int($0) })]
+        MPValue(["chatIds": .array(ids.map { .int($0) })])
     }
 
     public static func react(chatID: MaxChatID, messageID: MaxMessageID, emoji: String) -> MPValue {
-        [
+        MPValue([
             "chatId": .int(chatID),
             "messageId": .int(Int64(messageID) ?? 0),
-            "reaction": [
+            "reaction": MPValue([
                 "reactionType": .string("EMOJI"),
                 "id": .string(emoji)
-            ]
-        ]
+            ])
+        ])
     }
 
     public static func unreact(chatID: MaxChatID, messageID: MaxMessageID) -> MPValue {
-        ["chatId": .int(chatID), "messageId": .int(Int64(messageID) ?? 0)]
+        MPValue(["chatId": .int(chatID), "messageId": .int(Int64(messageID) ?? 0)])
     }
 
     public static func edit(chatID: MaxChatID, messageID: MaxMessageID, text: String) -> MPValue {
-        [
+        MPValue([
             "chatId": .int(chatID),
             "messageId": .string(messageID),
             "text": .string(text),
             "elements": .array([]),
             "attachments": .array([])
-        ]
+        ])
     }
 
     public static func delete(chatID: MaxChatID, messageID: MaxMessageID, forMe: Bool) -> MPValue {
-        [
+        MPValue([
             "chatId": .int(chatID),
             "messageIds": .array([.int(Int64(messageID) ?? 0)]),
             "forMe": .bool(forMe)
-        ]
+        ])
     }
 
     public static func contactByPhone(_ phone: String) -> MPValue {
-        ["phone": .string(phone)]
+        MPValue(["phone": .string(phone)])
     }
 }

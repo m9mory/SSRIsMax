@@ -89,12 +89,12 @@ enum SelfTest {
         roundTrip(.int(9_000_000_000_004), "int64 chatId")
         roundTrip(.string("Привет, мир"), "utf8 string")
         roundTrip(.binary(Data([0, 1, 2, 255])), "binary")
-        roundTrip(["a": .int(1), "b": .array([.bool(true), .string("x")])], "nested map")
+        roundTrip(MPValue(["a": .int(1), "b": .array([.bool(true), .string("x")])]), "nested map")
 
         print("Frames:")
         let frame = MaxFrame(version: 10, command: 0, sequence: 7,
                              opcode: MaxOpcode.msgSend.rawValue,
-                             payload: ["chatId": .int(9_000_000_000_004), "notify": .bool(true)])
+                             payload: MPValue(["chatId": .int(9_000_000_000_004), "notify": .bool(true)]))
         if let restored = try? MaxFrame(binaryData: frame.binaryData()) {
             check(restored.opcode == 64, "binary frame opcode")
             check(restored.sequence == 7, "binary frame seq")
@@ -123,40 +123,44 @@ enum SelfTest {
         }
 
         print("Parsers:")
-        let message = MaxParser.message(from: [
+        let message = MaxParser.message(from: MPValue([
             "id": .string("116762203424780659"),
             "time": .int(1_781_704_393_993),
             "sender": .int(9_000_000_000_003),
             "text": .string("текст"),
             "elements": .array([
-                [
+                MPValue([
                     "type": .string("LINK"),
                     "from": .int(0),
                     "length": .int(5),
-                    "attributes": ["url": .string("https://max.ru")]
-                ]
+                    "attributes": MPValue(["url": .string("https://max.ru")])
+                ])
             ])
-        ], chatID: 42)
+        ]), chatID: 42)
         check(message?.senderID == 9_000_000_000_003, "parse message sender")
         check(message?.elements.first?.url?.absoluteString == "https://max.ru", "parse link element")
 
-        let chat = MaxParser.chat(from: [
+        let chat = MaxParser.chat(from: MPValue([
             "id": .int(9_000_000_000_004),
             "type": .string("DIALOG"),
             "title": .string("Саша"),
             "participants": .map([MPMapKey("9000000000003"): .int(1_781_697_221_724)]),
             "newMessages": .int(3)
-        ])
+        ]))
         check(chat?.type == .dialog, "parse chat type")
         check(chat?.unreadCount == 3, "parse unread")
         check(chat?.peer(in: 9_000_000_000_003) == 9_000_000_000_004, "dialog peer")
 
         let event = MaxEventMapper.map(frame: MaxFrame(command: 0, sequence: 0,
                                                        opcode: MaxOpcode.msgSend.rawValue,
-                                                       payload: ["chatId": .int(5),
-                                                                 "message": ["id": .string("1"),
-                                                                             "text": .string("hi"),
-                                                                             "time": .int(1)]]))
+                                                       payload: MPValue([
+                                                           "chatId": .int(5),
+                                                           "message": MPValue([
+                                                               "id": .string("1"),
+                                                               "text": .string("hi"),
+                                                               "time": .int(1)
+                                                           ])
+                                                       ])))
         if case .newMessage(let mapped, let chatID) = event {
             check(mapped.text == "hi" && chatID == 5, "push → newMessage")
         } else {

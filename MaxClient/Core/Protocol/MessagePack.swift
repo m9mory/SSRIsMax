@@ -424,12 +424,13 @@ public extension MPValue {
     }
 
     private init(number: NSNumber) {
-        // Bool — это тоже NSNumber (CFBoolean), проверяем его первым.
-        if CFGetTypeID(number) == CFBooleanGetTypeID() {
+        // Bool в JSON приходит как NSNumber, но с objCType "c" (CFBoolean).
+        // CoreFoundation не берём: он не нужен и не всегда линкуется в SPM.
+        let objCType = String(cString: number.objCType)
+        if objCType == "c" || objCType == "B" {
             self = .bool(number.boolValue)
             return
         }
-        let objCType = String(cString: number.objCType)
         if objCType == "f" || objCType == "d" {
             self = .double(number.doubleValue)
             return

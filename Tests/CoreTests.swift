@@ -52,7 +52,7 @@ final class MessagePackTests: XCTestCase {
                              command: 0,
                              sequence: 7,
                              opcode: MaxOpcode.msgSend.rawValue,
-                             payload: ["chatId": .int(1), "notify": .bool(true)])
+                             payload: MPValue(["chatId": .int(1), "notify": .bool(true)]))
         let restored = try MaxFrame(binaryData: frame.binaryData())
         XCTAssertEqual(restored.opcode, MaxOpcode.msgSend.rawValue)
         XCTAssertEqual(restored.sequence, 7)
@@ -73,7 +73,8 @@ final class MessagePackTests: XCTestCase {
 
     func testJSONFrameEncodingKeepsTypes() throws {
         let frame = MaxFrame(command: 0, sequence: 1, opcode: 6,
-                             payload: ["deviceId": .string("abc"), "userAgent": ["deviceType": .string("IOS")]])
+                             payload: MPValue(["deviceId": .string("abc"),
+                                               "userAgent": MPValue(["deviceType": .string("IOS")])]))
         let object = try JSONSerialization.jsonObject(with: frame.jsonData()) as? [String: Any]
         XCTAssertEqual(object?["opcode"] as? Int, 6)
         XCTAssertNotNil(object?["payload"] as? [String: Any])
@@ -90,12 +91,12 @@ final class ParserTests: XCTestCase {
             "text": .string("текст"),
             "attaches": .array([]),
             "elements": .array([
-                [
+                MPValue([
                     "type": .string("LINK"),
                     "from": .int(0),
                     "length": .int(5),
-                    "attributes": ["url": .string("https://max.ru")]
-                ]
+                    "attributes": MPValue(["url": .string("https://max.ru")])
+                ])
             ])
         ]
         let message = try XCTUnwrap(MaxParser.message(from: raw, chatID: 42))        XCTAssertEqual(message.id, "116762203424780659")
@@ -128,8 +129,8 @@ final class ParserTests: XCTestCase {
     func testParseUserFromNamesArray() throws {
         let raw: MPValue = [
             "id": .int(9_000_000_000_003),
-            "names": .array([["name": .string("Иван Петров"), "type": .string("FULL_NAME")]]),
-            "phones": .array([["number": .string("+71234567890"), "type": .string("MOBILE")]])
+            "names": .array([MPValue(["name": .string("Иван Петров"), "type": .string("FULL_NAME")])]),
+            "phones": .array([MPValue(["number": .string("+71234567890"), "type": .string("MOBILE")])])
         ]
         let user = try XCTUnwrap(MaxParser.user(from: raw))
         XCTAssertEqual(user.fullName, "Иван Петров")
@@ -139,10 +140,10 @@ final class ParserTests: XCTestCase {
 
     func testMessageEventMapping() {
         let frame = MaxFrame(command: 0, sequence: 0, opcode: MaxOpcode.msgSend.rawValue,
-                             payload: ["chatId": .int(5),
-                                       "message": ["id": .string("1"),
-                                                   "text": .string("hi"),
-                                                   "time": .int(100)]])
+                             payload: MPValue(["chatId": .int(5),
+                                               "message": MPValue(["id": .string("1"),
+                                                                   "text": .string("hi"),
+                                                                   "time": .int(100)])]))
         guard case .newMessage(let message, let chatID) = MaxEventMapper.map(frame: frame) else {
             return XCTFail("expected newMessage")
         }
@@ -152,7 +153,7 @@ final class ParserTests: XCTestCase {
 
     func testTypingEventMapping() {
         let frame = MaxFrame(command: 0, sequence: 0, opcode: MaxOpcode.notifTyping.rawValue,
-                             payload: ["chatId": .int(5), "userId": .int(9)])
+                             payload: MPValue(["chatId": .int(5), "userId": .int(9)]))
         guard case .typing(let userID, let chatID) = MaxEventMapper.map(frame: frame) else {
             return XCTFail("expected typing")
         }
