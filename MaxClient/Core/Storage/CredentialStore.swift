@@ -9,7 +9,7 @@ import Security
 /// этот файл тянет Security.framework и в зеркало ядра не копируется,
 /// а протокол должен быть доступен и приложению, и CLI.
 public final class KeychainCredentialStore: MaxCredentialStore, @unchecked Sendable {
-    private let keychain = KeychainService(service: "ru.maxclient.app.session")
+    private let keychain = KeychainService(service: "ru.ssrismax.app.session")
     private let defaults: UserDefaults
 
     public init(defaults: UserDefaults = .standard) {

@@ -24,6 +24,8 @@ public final class MaxTCPTransport: MaxTransporting, @unchecked Sendable {
     private var buffer = Data()
     private var isOpen = false
     private var didNotifyDisconnect = false
+    /// Растёт при каждом успешном TLS-подключении.
+    private var generation = 0
 
     public init(host: String = MaxProtocol.tcpHost, port: UInt16 = MaxProtocol.tcpPort) {
         self.host = host
@@ -63,6 +65,20 @@ public final class MaxTCPTransport: MaxTransporting, @unchecked Sendable {
 
         task.resume()
         scheduleRead()
+
+        // TLS прошёл: соединение сменилось, серверная сессия пустая —
+        // вызывающая сторона обязана повторить INIT.
+        lock.lock()
+        generation += 1
+        lock.unlock()
+    }
+
+    public func ensureConnected() async throws {
+        lock.lock()
+        let alreadyOpen = isOpen && socket != nil
+        lock.unlock()
+        if alreadyOpen { return }
+        try await connect()
     }
 
     public func send(frame: MaxFrame) async throws {
@@ -84,6 +100,12 @@ public final class MaxTCPTransport: MaxTransporting, @unchecked Sendable {
     /// делает таблица ожиданий в request(_:timeout:).
     public func nextSeq() -> Int {
         pump.nextSeq() % 256
+    }
+
+    public var connectionGeneration: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return generation
     }
 
     public func request(_ frame: MaxFrame, timeout: TimeInterval) async throws -> MaxFrame {

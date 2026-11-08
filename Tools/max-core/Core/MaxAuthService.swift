@@ -20,8 +20,6 @@ public actor MaxAuthService {
     private let store: MaxCredentialStore
     private let userAgent: MaxRequests.UserAgent
 
-    private var initialized = false
-
     public init(transport: MaxTransporting,
                 store: MaxCredentialStore,
                 userAgent: MaxRequests.UserAgent = .init()) {
@@ -32,14 +30,26 @@ public actor MaxAuthService {
 
     // MARK: INIT
 
+    /// Номер соединения, на котором выполнялся INIT. Сбрасывать INIT при
+    /// переподключении обязательно: серверная сессия создаётся заново, и
+    /// без INIT любой opcode получит `cmd=3`.
+    private var initializedGeneration: Int?
+
     public func initialize() async throws {
-        guard !initialized else { return }
+        // Соединения может не быть вовсе: вход по SMS идёт без MaxClient,
+        // поэтому транспорт никто не открыл. Раньше INIT уходил в закрытый
+        // сокет и возвращал .notConnected («Нет соединения с сервером MAX»).
+        try await transport.ensureConnected()
+
+        let generation = transport.connectionGeneration
+        if initializedGeneration == generation { return }
+
         let frame = MaxFrame(command: 0,
                              sequence: transport.nextSeq(),
                              opcode: MaxOpcode.initSession.rawValue,
                              payload: MaxRequests.initSession(deviceID: store.deviceID, userAgent: userAgent))
         _ = try await transport.request(frame, timeout: MaxProtocol.requestTimeout)
-        initialized = true
+        initializedGeneration = generation
     }
 
     // MARK: SMS

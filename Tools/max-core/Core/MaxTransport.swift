@@ -45,6 +45,13 @@ public protocol MaxTransporting: AnyObject {
     var onDisconnect: ((Error?) -> Void)? { get set }
 
     func connect() async throws
+    /// Открывает соединение, если оно ещё не открыто.
+    ///
+    /// В отличие от `connect()`, повторный вызов безопасен и ничего не
+    /// делает для уже подключённого транспорта. Нужен на входе по SMS:
+    /// токена ещё нет, `MaxClient.connect` недостижим, а INIT слать
+    /// в закрытый сокет нельзя.
+    func ensureConnected() async throws
     func send(frame: MaxFrame) async throws
     /// Ждёт ответ с `sequence == frame.sequence`. Push автоматически
     /// уходят в `onEvent`.
@@ -58,6 +65,12 @@ public protocol MaxTransporting: AnyObject {
     /// одинаковым номером перетирают друг друга в таблице ожиданий —
     /// первый висит до таймаута, второй получает чужой ответ.
     func nextSeq() -> Int
+
+    /// Номер текущего соединения, растёт при каждом успешном `connect()`.
+    ///
+    /// Нужен, чтобы отличить «соединение то же, INIT уже сделан» от
+    /// «транспорт переподключился, и серверная сессия пустая».
+    var connectionGeneration: Int { get }
 }
 
 // MARK: - События сервера

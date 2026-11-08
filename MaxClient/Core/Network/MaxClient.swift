@@ -96,7 +96,11 @@ public actor MaxClient {
 
         setState(.connecting)
         do {
-            try await transport.connect()
+            // ensureConnected, а не connect: при входе по SMS соединение
+            // уже открыто и сессия инициализирована через INIT в
+            // MaxAuthService. Повторный connect сбросил бы счётчик seq и
+            // пересоздал сокет прямо перед LOGIN.
+            try await transport.ensureConnected()
         } catch {
             setState(.offline)
             throw error
