@@ -91,8 +91,15 @@ public enum MaxParser {
             raw = value?["contacts"]?.arrayItems ?? value?["users"]?.arrayItems ?? []
         }
         return raw.compactMap { entry -> MaxUser? in
-            if let user = user(from: entry) { return user }
-            // Часто приходит {id, type} — берём хотя бы id.
+            if var user = user(from: entry) {
+                // Контакты часто приходят как {id, type} без имени: вместо
+                // безликого «Без имени» подставляем id — так список читаем.
+                if user.fullName == "Без имени" {
+                    user.fullName = "Пользователь \(user.id)"
+                }
+                return user
+            }
+            // entry без id (или с id не того типа) — пробуем достать хотя бы id.
             if let id = int64(entry["id"]) ?? int64(entry["userId"]) {
                 return MaxUser(id: id, fullName: "Пользователь \(id)")
             }

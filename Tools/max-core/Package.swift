@@ -38,7 +38,7 @@ let package = Package(
             name: "max-core",
             dependencies: ["MaxCore"],
             path: ".",
-            exclude: ["Core"],
+            exclude: ["Core", "Tests"],
             sources: ["main.swift"]
         ),
         // Офлайн-тесты: XCTest рядом с ядром, без CLI-цели
