@@ -17,8 +17,13 @@ struct MaxClientApp: App {
             // База — обязательная часть клиента. Если файл не открывается
             // (место, повреждение), показываем диалог, а не падаем молча.
             assertionFailure("Не удалось открыть базу данных: \(error)")
-            let temporary = (try? DatabaseManager.makeQueue(url: DatabaseManager.temporaryURL()))
-                ?? (try! DatabaseQueue())
+            // Резерв — отдельный файл во временной папке. DatabaseQueue()
+            // без аргументов в GRDB не существует, а try! убивал бы
+            // приложение вместо мягкой деградации. Если не откроется и
+            // этот, роняем осознанно: без базы клиент нерабочий.
+            guard let temporary = try? DatabaseManager.makeQueue(url: DatabaseManager.temporaryURL()) else {
+                fatalError("Не удалось открыть резервную базу данных: \(error)")
+            }
             session = Session(store: store, settings: settings, db: temporary)
         }
 

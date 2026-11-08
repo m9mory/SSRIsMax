@@ -75,9 +75,12 @@ public final class DatabaseManager {
             }
 
             // FTS5 для поиска по тексту сообщений + триггеры синхронизации.
+            // FTS5-колонки бестиповые: у VirtualTableDefinition.column
+            // только один параметр (имя). Второй аргумент даёт
+            // "extra argument in call".
             try db.create(virtualTable: "message_search", using: FTS5()) { t in
                 t.column("text")
-                t.column("chatId", .text)
+                t.column("chatId")
             }
             try db.execute(sql: """
                 CREATE TRIGGER message_ai AFTER INSERT ON message BEGIN
