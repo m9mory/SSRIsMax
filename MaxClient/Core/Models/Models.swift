@@ -118,8 +118,11 @@ public struct MaxChat: Equatable, Sendable, Identifiable {
     }
 
     /// Собеседник в личном диалоге (не включая себя).
+    /// Возвращает nil, если userID вообще не участник: иначе `first`
+    /// отдавал бы произвольного участника и для постороннего id.
     public func peer(in userID: MaxUserID?) -> MaxUserID? {
         guard type == .dialog else { return nil }
+        guard let userID, participants[userID] != nil else { return nil }
         return participants.keys.first { $0 != userID }
     }
 }

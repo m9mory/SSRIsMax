@@ -329,9 +329,13 @@ public final class MessageRepository {
         let sanitized = "\"\(escaped)\""
 
         let records = try db.read { database in
+            // Индекс синхронизирован по rowid таблицы message (см.
+            // synchronize(withTable:) в DatabaseManager). Джойн по chatId
+            // склеивал бы каждое совпадение со всеми сообщениями чата и
+            // давал дубли.
             try MessageRecord.fetchAll(database, sql: """
                 SELECT message.* FROM message
-                JOIN message_search ON message_search.chatId = message.chatId
+                JOIN message_search ON message_search.rowid = message.rowid
                 WHERE message_search MATCH ?
                 ORDER BY message.timestamp DESC
                 LIMIT ?

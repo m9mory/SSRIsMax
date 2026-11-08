@@ -74,28 +74,22 @@ public final class DatabaseManager {
                 t.column("reactionsJSON", .text)
             }
 
-            // FTS5 для поиска по тексту сообщений + триггеры синхронизации.
+            // FTS5 для поиска по тексту сообщений.
             // FTS5-колонки бестиповые: у VirtualTableDefinition.column
             // только один параметр (имя). Второй аргумент даёт
             // "extra argument in call".
+            //
+            // synchronize(withTable:) переводит таблицу в режим external
+            // content: GRDB сам создаёт триггеры INSERT/DELETE/UPDATE в
+            // синтаксисе, который требует такой режим, и наполняет индекс
+            // существующими строками. Ручные триггеры были написаны в
+            // стиле external content, но таблица была обычной, поэтому
+            // DELETE падал с "SQL logic error".
             try db.create(virtualTable: "message_search", using: FTS5()) { t in
+                t.synchronize(withTable: "message")
                 t.column("text")
                 t.column("chatId")
             }
-            try db.execute(sql: """
-                CREATE TRIGGER message_ai AFTER INSERT ON message BEGIN
-                  INSERT INTO message_search(text, chatId) VALUES (new.text, new.chatId);
-                END;
-                CREATE TRIGGER message_ad AFTER DELETE ON message BEGIN
-                  INSERT INTO message_search(message_search, text, chatId)
-                    VALUES ('delete', old.text, old.chatId);
-                END;
-                CREATE TRIGGER message_au AFTER UPDATE ON message BEGIN
-                  INSERT INTO message_search(message_search, text, chatId)
-                    VALUES ('delete', old.text, old.chatId);
-                  INSERT INTO message_search(text, chatId) VALUES (new.text, new.chatId);
-                END;
-                """)
         }
 
         migrator.registerMigration("v2-subscription") { db in
