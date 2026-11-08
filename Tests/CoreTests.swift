@@ -266,7 +266,10 @@ final class RepositoryTests: XCTestCase {
     private var queue: DatabaseQueue!
 
     override func setUpWithError() throws {
-        queue = try DatabaseQueue()
+        // В GRDB нет DatabaseQueue() без аргументов: база в памяти
+        // открывается по специальному пути ":memory:". Каждый тест
+        // получает чистую изолированную базу.
+        queue = try DatabaseQueue(path: ":memory:")
         try DatabaseManager.migrator.migrate(queue)
     }
 

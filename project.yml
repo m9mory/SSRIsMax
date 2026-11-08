@@ -19,6 +19,12 @@ settings:
     CODE_SIGN_STYLE: Automatic
     SWIFT_STRICT_CONCURRENCY: minimal
     ENABLE_USER_SCRIPT_SANDBOXING: NO
+  configs:
+    # Тесты используют @testable import MaxClient (внутренние типы
+    # DatabaseManager.migrator и других). Xcode включает это для Debug
+    # сам, но фиксируем явно, чтобы сборка не зависела от умолчаний.
+    Debug:
+      ENABLE_TESTABILITY: YES
 
 targets:
   MaxClient:
@@ -41,6 +47,10 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: ru.maxclient.app
         PRODUCT_NAME: MAX
+        # Продукт называется MAX, но модуль — MaxClient: от PRODUCT_NAME
+        # Swift берёт имя модуля, и `@testable import MaxClient` в тестах
+        # падал бы с "no such module MAX". Явно фиксируем имя модуля.
+        PRODUCT_MODULE_NAME: MaxClient
         INFOPLIST_FILE: MaxClient/Resources/Info.plist
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         TARGETED_DEVICE_FAMILY: "1"
@@ -61,6 +71,11 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: ru.maxclient.tests
         GENERATE_INFOPLIST_FILE: YES
+        # XcodeGen выводит TEST_HOST из имени таргета (MaxClient), но
+        # продукт приложения называется MAX.app/MAX. Без явного пути
+        # xcodebuild падает с "Could not find test host for MaxCoreTests".
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/MAX.app/MAX"
+        BUNDLE_LOADER: "$(TEST_HOST)"
 
 schemes:
   MaxClient:
