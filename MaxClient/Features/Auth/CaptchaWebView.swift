@@ -11,14 +11,15 @@ import WebKit
 /// приложении, а `captchaToken`, который она получает после решения,
 /// подхватывается автоматически и уходит в VERIFICATION_REQUEST.
 ///
-/// Страница `id.vk.ru/not_robot_captcha` — это JS-приложение
-/// (VK Captcha), которое встраивает виджет в iframe. После галочки
-/// виджет отправляет родительскому окну сообщение
-/// `{type: "vk-sak-sdk", handler: "VKCaptchaGetResult", params: {token}}`.
-/// В адресе и в хранилищах токена нет — страница отдаёт его только этим
-/// сообщением и сразу использует, нигде не сохраняя. Поэтому мы ставим
-/// свой слушатель `message` и складываем токен в
-/// `window.__ssrismaxCaptchaToken`, откуда его и забирает опрос.
+/// Страница `id.vk.ru/not_robot_captcha` — это JS-приложение (VK
+/// Captcha): SDK создаёт виджет в iframe и слушает его ответы. После
+/// галочки из iframe приходит сообщение
+/// `{type: "vk-sak-sdk", message: {handler: "VKCaptchaGetResult",
+///   params: {token}}}` — обратите внимание, `handler` и `params`
+/// вложены в `message`, а не лежат на верхнем уровне. В адресе и в
+/// хранилищах токена нет, поэтому мы ставим свой слушатель `message` и
+/// складываем токен в `window.__ssrismaxCaptchaToken`, откуда его и
+/// забирает опрос.
 struct CaptchaWebView: UIViewRepresentable {
     let url: URL
     let onToken: (String) -> Void
@@ -48,9 +49,16 @@ struct CaptchaWebView: UIViewRepresentable {
           function grab(data) {
             try {
               if (!data || data.type !== 'vk-sak-sdk') { return; }
-              var params = data.params || {};
+              // Сообщение уходит как `{...t, type: "vk-sak-sdk"}`, где
+              // t — это `{message: {handler, params}}`. То есть handler
+              // и params лежат НА УРОВНЕ data.message, а не на верхнем.
+              // Плоский вариант оставляем как запасной на случай другой
+              // версии SDK.
+              var body = data.message || data;
+              var handler = body.handler || data.handler;
+              var params = body.params || data.params || {};
               var token = params.token || params.value;
-              if (data.handler === 'VKCaptchaGetResult' && token) {
+              if (handler === 'VKCaptchaGetResult' && token) {
                 window.__ssrismaxCaptchaToken = String(token);
               }
             } catch (err) {}
