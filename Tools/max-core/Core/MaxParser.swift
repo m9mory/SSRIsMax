@@ -84,7 +84,12 @@ public enum MaxParser {
     }
 
     public static func users(from value: MPValue?) -> [MaxUser] {
-        let raw = value?.arrayItems ?? (value?["contacts"]?.arrayItems ?? [])
+        // arrayItems возвращает [] (а не nil) для не-массивов, поэтому
+        // проверять вложенную обёртку нужно по пустоте, а не через ??.
+        var raw = value?.arrayItems ?? []
+        if raw.isEmpty {
+            raw = value?["contacts"]?.arrayItems ?? value?["users"]?.arrayItems ?? []
+        }
         return raw.compactMap { entry -> MaxUser? in
             if let user = user(from: entry) { return user }
             // Часто приходит {id, type} — берём хотя бы id.
@@ -132,7 +137,11 @@ public enum MaxParser {
 
     public static func chats(from value: MPValue?) -> [MaxChat] {
         guard let value else { return [] }
-        return value["chats"]?.arrayItems.compactMap { chat(from: $0) } ?? []
+        var raw = value.arrayItems
+        if raw.isEmpty {
+            raw = value["chats"]?.arrayItems ?? []
+        }
+        return raw.compactMap { chat(from: $0) }
     }
 
     // MARK: - Сообщения

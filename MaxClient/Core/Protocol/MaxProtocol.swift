@@ -158,7 +158,13 @@ public struct MaxFrame: Equatable, Sendable {
 
     /// Бинарный фрейм: массив `[ver, cmd, seq, opcode, payload]`.
     public init(binaryData: Data) throws {
-        let values = try MPDecoder.decodeAll(binaryData)
+        let decoded = try MPDecoder.decode(binaryData)
+        let values: [MPValue]
+        if case .array(let items) = decoded {
+            values = items
+        } else {
+            values = [decoded]
+        }
         guard values.count >= 5 else {
             throw MaxFrameError.invalidFrame("binary frame expects 5 values, got \(values.count)")
         }

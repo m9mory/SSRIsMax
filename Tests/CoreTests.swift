@@ -114,7 +114,11 @@ final class ParserTests: XCTestCase {
             "type": .string("DIALOG"),
             "title": .string("Саша"),
             "status": .string("ACTIVE"),
-            "participants": .map([MPMapKey("9000000000003"): .int(1_781_697_221_724)]),
+            // Я и собеседник: peer(in:) возвращает того, кто не я.
+            "participants": .map([
+                MPMapKey("9000000000003"): .int(1_781_697_221_724),
+                MPMapKey("9000000000004"): .int(1_781_697_221_725)
+            ]),
             "lastEventTime": .int(1_781_700_000_000),
             "newMessages": .int(3)
         ])
@@ -122,8 +126,8 @@ final class ParserTests: XCTestCase {
         XCTAssertEqual(chat.id, 9_000_000_000_004)
         XCTAssertEqual(chat.type, .dialog)
         XCTAssertEqual(chat.unreadCount, 3)
-        XCTAssertEqual(chat.participants.count, 1)
-        XCTAssertNil(chat.peer(in: 9_000_000_000_004))
+        XCTAssertEqual(chat.participants.count, 2)
+        XCTAssertNil(chat.peer(in: 9_000_000_000_005))
         XCTAssertEqual(chat.peer(in: 9_000_000_000_003), 9_000_000_000_004)
     }
 

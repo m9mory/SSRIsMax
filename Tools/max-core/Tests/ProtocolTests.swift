@@ -106,11 +106,17 @@ final class ProtocolTests: XCTestCase {
             "id": .int(9_000_000_000_004),
             "type": .string("DIALOG"),
             "title": .string("Саша"),
-            "participants": .map([MPMapKey("9000000000003"): .int(1_781_697_221_724)]),
+            // В диалоге два участника: я и собеседник. peer(in:) отдаёт
+            // того, кто не я, поэтому одного себя в карте недостаточно.
+            "participants": .map([
+                MPMapKey("9000000000003"): .int(1_781_697_221_724),
+                MPMapKey("9000000000004"): .int(1_781_697_221_725)
+            ]),
             "newMessages": .int(3)
         ])))
         XCTAssertEqual(chat.type, .dialog)
         XCTAssertEqual(chat.unreadCount, 3)
+        XCTAssertEqual(chat.participants.count, 2)
         XCTAssertEqual(chat.peer(in: 9_000_000_000_003), 9_000_000_000_004)
     }
 
