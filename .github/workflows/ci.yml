@@ -79,20 +79,12 @@ jobs:
           # Имена и версии симуляторов на раннере меняются (iPhone 16/17,
           # iOS 18/26), поэтому берём первый доступный iPhone старшей ОС.
           xcrun simctl list devices available -j > "$RUNNER_TEMP/devices.json"
-          UDID=$(/usr/bin/python3 -c '
-import json, os, sys
-path = os.path.join(os.environ["RUNNER_TEMP"], "devices.json")
-with open(path, encoding="utf-8") as handle:
-    devices = json.load(handle)["devices"]
-for runtime in sorted(devices, reverse=True):
-    if "iOS" not in runtime:
-        continue
-    for device in devices[runtime]:
-        if device["name"].startswith("iPhone"):
-            print(device["udid"])
-            sys.exit(0)
-sys.exit(1)
-')
+          UDID=$(grep -o '"udid" : "[0-9A-F-]*"' "$RUNNER_TEMP/devices.json" \
+                 | head -1 | sed -E 's/.*"udid" : "([0-9A-F-]+)".*/\1/')
+          if [ -z "$UDID" ]; then
+            echo "Не нашли ни одного симулятора" >&2
+            exit 1
+          fi
           echo "SIM_ID=$UDID" >> "$GITHUB_ENV"
           echo "Симулятор: $UDID"
 
