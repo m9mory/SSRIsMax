@@ -10,7 +10,7 @@ public enum MaxProtocol {
     // Транспорт
     public static let wsURL = "wss://ws-api.oneme.ru/websocket"
     public static let tcpHost = "api.oneme.ru"
-    public static let tcpPort = 443
+    public static let tcpPort: UInt16 = 443
 
     /// JSON-эндпоинт (web.max.ru), версия 11.
     public static let jsonVersion = 11

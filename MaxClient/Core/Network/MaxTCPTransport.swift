@@ -165,7 +165,7 @@ public final class MaxTCPTransport: MaxTransporting, @unchecked Sendable {
                                                                 command: 0,
                                                                 sequence: seq,
                                                                 opcode: MaxOpcode.ping.rawValue,
-                                                                payload: ["interactive": .bool(true)])) }
+                                                                payload: ["interactive": .bool(true)] as MPValue)) }
                 }
                 onEvent?(event)
             }

@@ -89,12 +89,12 @@ enum SelfTest {
         roundTrip(.int(9_000_000_000_004), "int64 chatId")
         roundTrip(.string("Привет, мир"), "utf8 string")
         roundTrip(.binary(Data([0, 1, 2, 255])), "binary")
-        roundTrip(["a": 1, "b": .array([true, "x"])], "nested map")
+        roundTrip(["a": .int(1), "b": .array([.bool(true), .string("x")])], "nested map")
 
         print("Frames:")
         let frame = MaxFrame(version: 10, command: 0, sequence: 7,
                              opcode: MaxOpcode.msgSend.rawValue,
-                             payload: ["chatId": .int(9_000_000_000_004), "notify": true])
+                             payload: ["chatId": .int(9_000_000_000_004), "notify": .bool(true)])
         if let restored = try? MaxFrame(binaryData: frame.binaryData()) {
             check(restored.opcode == 64, "binary frame opcode")
             check(restored.sequence == 7, "binary frame seq")
@@ -124,21 +124,27 @@ enum SelfTest {
 
         print("Parsers:")
         let message = MaxParser.message(from: [
-            "id": "116762203424780659",
+            "id": .string("116762203424780659"),
             "time": .int(1_781_704_393_993),
             "sender": .int(9_000_000_000_003),
-            "text": "текст",
-            "elements": .array([["type": "LINK", "from": .int(0), "length": .int(5),
-                                "attributes": ["url": "https://max.ru"]]])
+            "text": .string("текст"),
+            "elements": .array([
+                [
+                    "type": .string("LINK"),
+                    "from": .int(0),
+                    "length": .int(5),
+                    "attributes": ["url": .string("https://max.ru")]
+                ]
+            ])
         ], chatID: 42)
         check(message?.senderID == 9_000_000_000_003, "parse message sender")
         check(message?.elements.first?.url?.absoluteString == "https://max.ru", "parse link element")
 
         let chat = MaxParser.chat(from: [
             "id": .int(9_000_000_000_004),
-            "type": "DIALOG",
-            "title": "Саша",
-            "participants": ["9000000000003": .int(1_781_697_221_724)],
+            "type": .string("DIALOG"),
+            "title": .string("Саша"),
+            "participants": .map([MPMapKey("9000000000003"): .int(1_781_697_221_724)]),
             "newMessages": .int(3)
         ])
         check(chat?.type == .dialog, "parse chat type")
@@ -148,7 +154,9 @@ enum SelfTest {
         let event = MaxEventMapper.map(frame: MaxFrame(command: 0, sequence: 0,
                                                        opcode: MaxOpcode.msgSend.rawValue,
                                                        payload: ["chatId": .int(5),
-                                                                 "message": ["id": "1", "text": "hi", "time": .int(1)]]))
+                                                                 "message": ["id": .string("1"),
+                                                                             "text": .string("hi"),
+                                                                             "time": .int(1)]]))
         if case .newMessage(let mapped, let chatID) = event {
             check(mapped.text == "hi" && chatID == 5, "push → newMessage")
         } else {
@@ -183,7 +191,7 @@ enum NetworkCheck {
             : MaxWebSocketTransport()
     }
 
-    static final class InMemoryStore: MaxCredentialStore {
+    final class InMemoryStore: MaxCredentialStore {
         var deviceID = UUID().uuidString.lowercased()
         var accessToken: String?
         var currentUserID: MaxUserID?
@@ -194,7 +202,7 @@ enum NetworkCheck {
         let t = transport
         do {
             try await t.connect()
-            let auth = MaxAuthService(transport: t, store: InMemoryStore())
+            let auth = MaxAuthService(transport: t, store: NetworkCheck.InMemoryStore())
             try await auth.initialize()
             print("INIT прошёл — соединение с ws-api.oneme.ru работает ✅")
         } catch {
@@ -207,7 +215,7 @@ enum NetworkCheck {
 
     static func interactiveAuth(phone: String) async {
         let t = transport
-        let store = InMemoryStore()
+        let store = NetworkCheck.InMemoryStore()
         let auth = MaxAuthService(transport: t, store: store)
 
         do {

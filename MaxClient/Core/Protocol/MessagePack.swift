@@ -178,8 +178,7 @@ public enum MPDecoder {
             case 0xd3:
                 return .int(try bigEndian(Int64.self))
             case 0xd4, 0xd5, 0xd6, 0xd7, 0xd8: // fixext 1/2/4/8/16
-                let lengths = [0xd4: 1, 0xd5: 2, 0xd6: 4, 0xd7: 8, 0xd8: 16]
-                let length = lengths[prefix]!
+                let length = 1 << Int(prefix - 0xd4)
                 let type = Int8(bitPattern: try u8())
                 return .ext(type: type, data: try rawBytes(length))
             case 0xd9: // str 8
@@ -381,6 +380,67 @@ public enum MPEncoder {
 // MARK: - Удобства доступа
 
 public extension MPValue {
+    /// Разрешает писать `["chatId": .int(1)]` там, где ожидается `MPValue`.
+    init(_ map: [String: MPValue]) {
+        self = .map(map.reduce(into: [MPMapKey: MPValue]()) { $0[MPMapKey($1.key)] = $1.value })
+    }
+
+    /// Рекурсивная сборка из JSON-объекта (ответ сервера в JSON-транспорте).
+    ///
+    /// Числа проверяем на точность: `Double` не переживёт Int64-идентификаторы
+    /// MAX, поэтому `NSNumber` разбираем через строковое представление.
+    init(jsonObject any: Any) {
+        switch any {
+        case let value as MPValue:
+            self = value
+        case is NSNull:
+            self = .null
+        case let bool as Bool:
+            self = .bool(bool)
+        case let data as Data:
+            self = .binary(data)
+        case let string as String:
+            self = .string(string)
+        case let number as NSNumber:
+            self = MPValue(number: number)
+        case let array as [Any]:
+            self = .array(array.map { MPValue(jsonObject: $0) })
+        case let dictionary as [String: Any]:
+            var map: [MPMapKey: MPValue] = [:]
+            map.reserveCapacity(dictionary.count)
+            for (key, value) in dictionary {
+                map[MPMapKey(key)] = MPValue(jsonObject: value)
+            }
+            self = .map(map)
+        case let dictionary as [AnyHashable: Any]:
+            var map: [MPMapKey: MPValue] = [:]
+            for (key, value) in dictionary {
+                map[MPMapKey(MPValue(jsonObject: key))] = MPValue(jsonObject: value)
+            }
+            self = .map(map)
+        default:
+            self = .string(String(describing: any))
+        }
+    }
+
+    private init(number: NSNumber) {
+        // Bool — это тоже NSNumber (CFBoolean), проверяем его первым.
+        if CFGetTypeID(number) == CFBooleanGetTypeID() {
+            self = .bool(number.boolValue)
+            return
+        }
+        let objCType = String(cString: number.objCType)
+        if objCType == "f" || objCType == "d" {
+            self = .double(number.doubleValue)
+            return
+        }
+        if let exact = Int64(number.stringValue) {
+            self = .int(exact)
+            return
+        }
+        self = .double(number.doubleValue)
+    }
+
     subscript(key: String) -> MPValue? {
         if case .map(let map) = self { return map[MPMapKey(key)] }
         return nil
@@ -399,6 +459,15 @@ public extension MPValue {
         case .int(let i): return i
         case .double(let d): return Int64(exactly: d.rounded())
         case .string(let s): return Int64(s)
+        default: return nil
+        }
+    }
+
+    var double: Double? {
+        switch self {
+        case .double(let d): return d
+        case .int(let i): return Double(i)
+        case .string(let s): return Double(s)
         default: return nil
         }
     }

@@ -141,7 +141,7 @@ public actor MaxClient {
             let frame = MaxFrame(command: 0,
                                  sequence: pump.nextSeq(),
                                  opcode: MaxOpcode.ping.rawValue,
-                                 payload: ["interactive": .bool(true)])
+                                 payload: MPValue(["interactive": .bool(true)]))
             try await transport.send(frame: frame)
         } catch {
             setState(.offline)
@@ -236,7 +236,7 @@ public actor MaxClient {
 
     public func contact(ids: [MaxUserID]) async throws -> [MaxUser] {
         let payload = try await perform(.getContacts,
-                                        payload: ["contactIds": .array(ids.map { .int($0) })])
+                                        payload: MPValue(["contactIds": .array(ids.map { .int($0) })]))
         return MaxParser.users(from: payload)
     }
 

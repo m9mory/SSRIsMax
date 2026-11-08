@@ -1,3 +1,4 @@
+import Foundation
 import XCTest
 import GRDB
 @testable import MaxClient
@@ -35,7 +36,7 @@ final class MessagePackTests: XCTestCase {
                 "text": "Привет",
                 "cid": .int(1_734_567_890_123),
                 "elements": .array([]),
-                "attaches": .array([["_type": "PHOTO", "width": .int(800)]])
+                "attaches": .array([["_type": .string("PHOTO"), "width": .int(800)]])
             ],
             "notify": .bool(true)
         ]
@@ -72,7 +73,7 @@ final class MessagePackTests: XCTestCase {
 
     func testJSONFrameEncodingKeepsTypes() throws {
         let frame = MaxFrame(command: 0, sequence: 1, opcode: 6,
-                             payload: ["deviceId": "abc", "userAgent": ["deviceType": "IOS"]])
+                             payload: ["deviceId": .string("abc"), "userAgent": ["deviceType": .string("IOS")]])
         let object = try JSONSerialization.jsonObject(with: frame.jsonData()) as? [String: Any]
         XCTAssertEqual(object?["opcode"] as? Int, 6)
         XCTAssertNotNil(object?["payload"] as? [String: Any])
@@ -82,17 +83,22 @@ final class MessagePackTests: XCTestCase {
 final class ParserTests: XCTestCase {
     func testParseMessage() throws {
         let raw: MPValue = [
-            "id": "116762203424780659",
+            "id": .string("116762203424780659"),
             "time": .int(1_781_704_393_993),
-            "type": "USER",
+            "type": .string("USER"),
             "sender": .int(9_000_000_000_003),
-            "text": "текст",
+            "text": .string("текст"),
             "attaches": .array([]),
-            "elements": .array([["type": "LINK", "from": .int(0), "length": .int(5),
-                                "attributes": ["url": "https://max.ru"]]])
+            "elements": .array([
+                [
+                    "type": .string("LINK"),
+                    "from": .int(0),
+                    "length": .int(5),
+                    "attributes": ["url": .string("https://max.ru")]
+                ]
+            ])
         ]
-        let message = try XCTUnwrap(MaxParser.message(from: raw, chatID: 42))
-        XCTAssertEqual(message.id, "116762203424780659")
+        let message = try XCTUnwrap(MaxParser.message(from: raw, chatID: 42))        XCTAssertEqual(message.id, "116762203424780659")
         XCTAssertEqual(message.senderID, 9_000_000_000_003)
         XCTAssertEqual(message.chatID, 42)
         XCTAssertEqual(message.text, "текст")
@@ -103,10 +109,10 @@ final class ParserTests: XCTestCase {
     func testParseChatWithParticipants() throws {
         let raw: MPValue = [
             "id": .int(9_000_000_000_004),
-            "type": "DIALOG",
-            "title": "Саша",
-            "status": "ACTIVE",
-            "participants": ["9000000000003": .int(1_781_697_221_724)],
+            "type": .string("DIALOG"),
+            "title": .string("Саша"),
+            "status": .string("ACTIVE"),
+            "participants": .map([MPMapKey("9000000000003"): .int(1_781_697_221_724)]),
             "lastEventTime": .int(1_781_700_000_000),
             "newMessages": .int(3)
         ]
@@ -122,8 +128,8 @@ final class ParserTests: XCTestCase {
     func testParseUserFromNamesArray() throws {
         let raw: MPValue = [
             "id": .int(9_000_000_000_003),
-            "names": .array([["name": "Иван Петров", "type": "FULL_NAME"]]),
-            "phones": .array([["number": "+71234567890", "type": "MOBILE"]])
+            "names": .array([["name": .string("Иван Петров"), "type": .string("FULL_NAME")]]),
+            "phones": .array([["number": .string("+71234567890"), "type": .string("MOBILE")]])
         ]
         let user = try XCTUnwrap(MaxParser.user(from: raw))
         XCTAssertEqual(user.fullName, "Иван Петров")
@@ -134,7 +140,9 @@ final class ParserTests: XCTestCase {
     func testMessageEventMapping() {
         let frame = MaxFrame(command: 0, sequence: 0, opcode: MaxOpcode.msgSend.rawValue,
                              payload: ["chatId": .int(5),
-                                       "message": ["id": "1", "text": "hi", "time": .int(100)]])
+                                       "message": ["id": .string("1"),
+                                                   "text": .string("hi"),
+                                                   "time": .int(100)]])
         guard case .newMessage(let message, let chatID) = MaxEventMapper.map(frame: frame) else {
             return XCTFail("expected newMessage")
         }

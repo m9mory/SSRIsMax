@@ -30,6 +30,18 @@ public enum MaxParser {
         int64(value) ?? 0
     }
 
+    /// Текущее время в миллисекундах. Нужно для дефолтных аргументов
+    /// из `public` API, поэтому `public`.
+    public static func nowMillis() -> UnixMillis {
+        Int64(Date().timeIntervalSince1970 * 1000)
+    }
+
+    /// Обращение к примитивам из замыканий, где локальные имена (`url`)
+    /// затеняют статические методы парсера.
+    private enum helper {
+        static func url(_ value: MPValue?) -> URL? { MaxParser.url(value) }
+    }
+
     // MARK: - Пользователи
 
     public static func user(from value: MPValue, fallbackID: MaxUserID? = nil) -> MaxUser? {
@@ -174,19 +186,19 @@ public enum MaxParser {
                 if let s = val.string { raw[key.description] = s }
             }
 
-            let url = url(entry["url"])
-                ?? url(entry["fileUrl"])
-                ?? url(entry["baseUrl"])
-                ?? url(entry["photoUrl"])
+            let remoteURL = helper.url(entry["url"])
+                ?? helper.url(entry["fileUrl"])
+                ?? helper.url(entry["baseUrl"])
+                ?? helper.url(entry["photoUrl"])
 
-            let thumb = url(entry["thumbnail"]?["url"])
-                ?? url(entry["preview"]?["url"])
-                ?? url(entry["thumbUrl"])
+            let thumb = helper.url(entry["thumbnail"]?["url"])
+                ?? helper.url(entry["preview"]?["url"])
+                ?? helper.url(entry["thumbUrl"])
 
             return MaxAttachment(
                 id: string(entry["fileId"]) ?? string(entry["photoId"]) ?? UUID().uuidString,
                 kind: kind,
-                url: url,
+                url: remoteURL,
                 thumbnailURL: thumb,
                 fileName: string(entry["fileName"]) ?? string(entry["name"]),
                 fileSize: int64(entry["fileSize"]) ?? int64(entry["size"]),
@@ -270,14 +282,14 @@ public enum MaxRequests {
             "language": .string("ru")
         ]
         if let captchaToken { payload["captchaToken"] = .string(captchaToken) }
-        return .object(payload)
+        return MPValue(payload)
     }
 
     public static func enterCode(token: String, code: String) -> MPValue {
         [
             "token": .string(token),
             "verifyCode": .string(code),
-            "authTokenType": "CHECK_CODE"
+            "authTokenType": .string("CHECK_CODE")
         ]
     }
 
@@ -330,7 +342,7 @@ public enum MaxRequests {
 
     public static func markRead(chatID: MaxChatID, messageID: MaxMessageID, mark: UnixMillis) -> MPValue {
         [
-            "type": "READ_MESSAGE",
+            "type": .string("READ_MESSAGE"),
             "chatId": .int(chatID),
             "messageId": .string(messageID),
             "mark": .int(mark)
@@ -354,7 +366,7 @@ public enum MaxRequests {
             "chatId": .int(chatID),
             "messageId": .int(Int64(messageID) ?? 0),
             "reaction": [
-                "reactionType": "EMOJI",
+                "reactionType": .string("EMOJI"),
                 "id": .string(emoji)
             ]
         ]
@@ -384,9 +396,5 @@ public enum MaxRequests {
 
     public static func contactByPhone(_ phone: String) -> MPValue {
         ["phone": .string(phone)]
-    }
-
-    static func nowMillis() -> UnixMillis {
-        Int64(Date().timeIntervalSince1970 * 1000)
     }
 }

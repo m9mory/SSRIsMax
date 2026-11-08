@@ -1,5 +1,7 @@
+import Foundation
 import XCTest
 @testable import MaxCore
+
 
 /// Офлайн-проверки ядра: протокол, кодирование, парсеры.
 /// Идут без сети и без iOS — поэтому прогоняются в CI на macOS.
@@ -23,16 +25,41 @@ final class ProtocolTests: XCTestCase {
         let value: MPValue = [
             "chatId": .int(9_000_000_000_004),
             "message": [
-                "text": "Привет",
+                "text": .string("Привет"),
                 "cid": .int(1_734_567_890_123),
                 "elements": .array([]),
-                "attaches": .array([["_type": "PHOTO", "width": .int(800)]])
+                "attaches": .array([["_type": .string("PHOTO"), "width": .int(800)]])
             ],
             "notify": .bool(true)
         ]
         let decoded = try MPDecoder.decode(MPEncoder.encode(value))
         XCTAssertEqual(decoded, value)
         XCTAssertEqual(decoded["message"]?["text"]?.string, "Привет")
+    }
+
+    /// fixext длиной 1/2/4/8/16 — сервер MAX шлёт так Int64 и время.
+    /// Раньше здесь был словарь с `UInt8`-ключом, и декодер падал в рантайме.
+    func testFixExtLengths() throws {
+        for length in [1, 2, 4, 8, 16] {
+            let value = MPValue.ext(type: 1, data: Data(repeating: 0, count: length))
+            let decoded = try MPDecoder.decode(MPEncoder.encode(value))
+            XCTAssertEqual(decoded, value, "fixext \(length)")
+        }
+    }
+
+    /// JSON-кадр приходит как `Any`: имена полей, вложенные объекты и
+    /// 64-битные id должны переживать конвертацию без потерь.
+    func testJSONPayloadConversion() throws {
+        let json = """
+        {"ver":11,"cmd":0,"seq":3,"opcode":64,"payload":{\
+        "chatId":9000000000004,"notify":true,"ratio":0.5,\
+        "message":{"text":"Привет","cid":1734567890123}}}
+        """
+        let frame = try MaxFrame(jsonData: Data(json.utf8))
+        XCTAssertEqual(frame.payload["chatId"]?.int64, 9_000_000_000_004)
+        XCTAssertEqual(frame.payload["notify"]?.bool, true)
+        XCTAssertEqual(frame.payload["ratio"]?.double, 0.5)
+        XCTAssertEqual(frame.payload["message"]?["text"]?.string, "Привет")
     }
 
     func testBinaryFrame() throws {
@@ -59,21 +86,27 @@ final class ProtocolTests: XCTestCase {
 
     func testParseMessageAndChat() throws {
         let message = try XCTUnwrap(MaxParser.message(from: [
-            "id": "116762203424780659",
+            "id": .string("116762203424780659"),
             "time": .int(1_781_704_393_993),
             "sender": .int(9_000_000_000_003),
-            "text": "текст",
-            "elements": .array([["type": "LINK", "from": .int(0), "length": .int(5),
-                                "attributes": ["url": "https://max.ru"]]])
+            "text": .string("текст"),
+            "elements": .array([
+                [
+                    "type": .string("LINK"),
+                    "from": .int(0),
+                    "length": .int(5),
+                    "attributes": ["url": .string("https://max.ru")]
+                ]
+            ])
         ], chatID: 42))
         XCTAssertEqual(message.senderID, 9_000_000_000_003)
         XCTAssertEqual(message.elements.first?.url?.absoluteString, "https://max.ru")
 
         let chat = try XCTUnwrap(MaxParser.chat(from: [
             "id": .int(9_000_000_000_004),
-            "type": "DIALOG",
-            "title": "Саша",
-            "participants": ["9000000000003": .int(1_781_697_221_724)],
+            "type": .string("DIALOG"),
+            "title": .string("Саша"),
+            "participants": .map([MPMapKey("9000000000003"): .int(1_781_697_221_724)]),
             "newMessages": .int(3)
         ]))
         XCTAssertEqual(chat.type, .dialog)
@@ -85,7 +118,9 @@ final class ProtocolTests: XCTestCase {
         let frame = MaxFrame(command: 0, sequence: 0,
                              opcode: MaxOpcode.msgSend.rawValue,
                              payload: ["chatId": .int(5),
-                                       "message": ["id": "1", "text": "hi", "time": .int(1)]])
+                                       "message": ["id": .string("1"),
+                                                   "text": .string("hi"),
+                                                   "time": .int(1)]])
         guard case .newMessage(let message, let chatID) = MaxEventMapper.map(frame: frame) else {
             return XCTFail("ожидалось newMessage")
         }
@@ -141,8 +176,8 @@ final class RequestTests: XCTestCase {
     func testChatsAndUsersParsing() {
         let chats = MaxParser.chats(from: [
             "chats": .array([
-                ["id": .int(1), "type": "DIALOG", "title": "А", "newMessages": .int(2)],
-                ["id": .int(2), "type": "CHAT", "title": "Б", "newMessages": .int(0)]
+                ["id": .int(1), "type": .string("DIALOG"), "title": .string("А"), "newMessages": .int(2)],
+                ["id": .int(2), "type": .string("CHAT"), "title": .string("Б"), "newMessages": .int(0)]
             ])
         ])
         XCTAssertEqual(chats.count, 2)
@@ -152,7 +187,7 @@ final class RequestTests: XCTestCase {
         // users() принимает и голый массив, и обёртку — проверяем оба вида.
         let users = MaxParser.users(from: [
             ["id": .int(9_000_000_000_003),
-             "names": .array([["name": "Иван Петров", "type": "FULL_NAME"]])]
+             "names": .array([["name": .string("Иван Петров"), "type": .string("FULL_NAME")]])]
         ])
         XCTAssertEqual(users.first?.fullName, "Иван Петров")
         XCTAssertEqual(users.first?.initials, "ИП")

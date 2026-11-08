@@ -4,23 +4,11 @@ import Security
 /// Долговременное хранилище (UserDefaults + Keychain).
 ///
 /// Токен и deviceId — секреты: Keychain. Настройки — UserDefaults.
-public protocol MaxCredentialStore: AnyObject {
-    var deviceID: String { get }
-    var accessToken: String? { get set }
-    var currentUserID: MaxUserID? { get set }
-    func clearSession()
-
-    /// Кеш профиля: онлайн-соединение не делает повторный LOGIN,
-    /// поэтому имя и телефон для UI берутся отсюда.
-    func cacheProfile(_ user: MaxUser)
-    func cachedProfile() throws -> MaxUser?
-}
-
-public extension MaxCredentialStore {
-    func cacheProfile(_ user: MaxUser) {}
-    func cachedProfile() throws -> MaxUser? { nil }
-}
-
+///
+/// Протокол `MaxCredentialStore` объявлен в ядре
+/// (`Tools/max-core/Core/MaxMemoryCredentialStore.swift`): он нужен
+/// CLI-сборке, где нет Security.framework. Файл ядра намеренно НЕ
+/// копируется в приложение, чтобы не дублировать декларацию.
 public final class KeychainCredentialStore: MaxCredentialStore, @unchecked Sendable {
     private let keychain = KeychainService(service: "ru.maxclient.app.session")
     private let defaults: UserDefaults
