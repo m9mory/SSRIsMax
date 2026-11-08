@@ -10,11 +10,14 @@ import PackageDescription
 // CLI-цели здесь нет намеренно: у main.swift верхнеуровневый `await`,
 // который SwiftPM не пускает вместе с XCTest в одном пакете.
 
+// Core лежит в родительском каталоге: core-kit — вложенный пакет,
+// а путь в Package.swift всегда относителен каталога самого пакета,
+// не корня репозитория. Поэтому "../Core", а не "Core".
 let package = Package(
     name: "MaxCoreKit",
     platforms: [.macOS(.v13)],
     targets: [
-        .target(name: "MaxCore", path: "Core"),
+        .target(name: "MaxCore", path: "../Core"),
         .testTarget(name: "MaxCoreTests", dependencies: ["MaxCore"], path: "Tests")
     ]
 )
