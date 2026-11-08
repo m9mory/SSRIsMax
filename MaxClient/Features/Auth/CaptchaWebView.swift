@@ -84,6 +84,22 @@ struct CaptchaWebView: UIViewRepresentable {
           //    событие раньше обработчиков страницы.
           window.addEventListener('message', function (e) { grab(e && e.data); }, true);
 
+          // 1b) Перехват исходящих postMessage: в этом окне и в родителе.
+          //     Так видно, отправляет ли виджет что-то вообще, даже если
+          //     событие не доходит до слушателя.
+          var rawPost = window.postMessage;
+          if (rawPost) {
+            window.postMessage = function (msg) {
+              try {
+                window.__ssrismaxSent = (window.__ssrismaxSent || 0) + 1;
+                var tail = String(msg && (msg.handler || (msg.message && msg.message.handler) || 'no-handler'));
+                window.__ssrismaxSentLog = (tail + ' | ' + (window.__ssrismaxSentLog || '')).slice(0, 400);
+                grab(msg);
+              } catch (err) {}
+              return rawPost.apply(window, arguments);
+            };
+          }
+
           // Диагностическая панель: показывает, доходят ли сообщения и в
           // каком они виде. Без неё причину «окно висит» не увидеть.
           window.__ssrismaxShowDebug = function (text) {
@@ -240,13 +256,26 @@ struct CaptchaWebView: UIViewRepresentable {
             let script = """
             (function () {
               if (window.__ssrismaxCaptchaToken) { return 'TOKEN'; }
-              if (window.__ssrismaxCaptchaHook) {
-                var seen = window.__ssrismaxCaptchaSeen || 0;
-                var log = window.__ssrismaxCaptchaLog || '';
-                if (seen > 0) { return 'seen=' + seen + '\\n' + log; }
-                return 'hook=on, сообщений нет';
-              }
-              return 'hook НЕ установлен';
+              var out = [];
+              out.push('hook=' + (window.__ssrismaxCaptchaHook ? 'on' : 'НЕТ'));
+              out.push('seen=' + (window.__ssrismaxCaptchaSeen || 0));
+              out.push('sent=' + (window.__ssrismaxSent || 0));
+              if (window.__ssrismaxSentLog) { out.push('sentLog: ' + window.__ssrismaxSentLog); }
+              out.push('top=' + (window.parent === window ? 'yes' : 'no'));
+              try {
+                var ifr = document.getElementsByTagName('iframe');
+                out.push('iframe=' + ifr.length);
+                for (var i = 0; i < ifr.length && i < 3; i++) {
+                  var s = ifr[i].src || '(no src)';
+                  out.push('  [' + i + '] ' + s.slice(0, 90));
+                }
+                var roots = document.querySelectorAll('[data-test-id="captcha-widget"]');
+                out.push('widget=' + roots.length);
+                out.push('body=' + (document.body ? document.body.children.length : -1));
+              } catch (e) { out.push('err=' + e.message); }
+              var log = window.__ssrismaxCaptchaLog || '';
+              if (log) { out.push('--- log ---'); out.push(log); }
+              return out.join('\\n');
             })();
             """
             return await withCheckedContinuation { continuation in
