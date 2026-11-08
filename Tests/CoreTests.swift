@@ -30,16 +30,16 @@ final class MessagePackTests: XCTestCase {
     }
 
     func testRoundTripNested() throws {
-        let value: MPValue = [
+        let value = MPValue([
             "chatId": .int(9_000_000_000_004),
-            "message": [
-                "text": "Привет",
+            "message": MPValue([
+                "text": .string("Привет"),
                 "cid": .int(1_734_567_890_123),
                 "elements": .array([]),
-                "attaches": .array([["_type": .string("PHOTO"), "width": .int(800)]])
-            ],
+                "attaches": .array([MPValue(["_type": .string("PHOTO"), "width": .int(800)])])
+            ]),
             "notify": .bool(true)
-        ]
+        ])
 
         let decoded = try MPDecoder.decode(MPEncoder.encode(value))
         XCTAssertEqual(decoded, value)
@@ -83,7 +83,7 @@ final class MessagePackTests: XCTestCase {
 
 final class ParserTests: XCTestCase {
     func testParseMessage() throws {
-        let raw: MPValue = [
+        let raw = MPValue([
             "id": .string("116762203424780659"),
             "time": .int(1_781_704_393_993),
             "type": .string("USER"),
@@ -98,8 +98,9 @@ final class ParserTests: XCTestCase {
                     "attributes": MPValue(["url": .string("https://max.ru")])
                 ])
             ])
-        ]
-        let message = try XCTUnwrap(MaxParser.message(from: raw, chatID: 42))        XCTAssertEqual(message.id, "116762203424780659")
+        ])
+        let message = try XCTUnwrap(MaxParser.message(from: raw, chatID: 42))
+        XCTAssertEqual(message.id, "116762203424780659")
         XCTAssertEqual(message.senderID, 9_000_000_000_003)
         XCTAssertEqual(message.chatID, 42)
         XCTAssertEqual(message.text, "текст")
@@ -108,7 +109,7 @@ final class ParserTests: XCTestCase {
     }
 
     func testParseChatWithParticipants() throws {
-        let raw: MPValue = [
+        let raw = MPValue([
             "id": .int(9_000_000_000_004),
             "type": .string("DIALOG"),
             "title": .string("Саша"),
@@ -116,7 +117,7 @@ final class ParserTests: XCTestCase {
             "participants": .map([MPMapKey("9000000000003"): .int(1_781_697_221_724)]),
             "lastEventTime": .int(1_781_700_000_000),
             "newMessages": .int(3)
-        ]
+        ])
         let chat = try XCTUnwrap(MaxParser.chat(from: raw))
         XCTAssertEqual(chat.id, 9_000_000_000_004)
         XCTAssertEqual(chat.type, .dialog)
@@ -127,11 +128,11 @@ final class ParserTests: XCTestCase {
     }
 
     func testParseUserFromNamesArray() throws {
-        let raw: MPValue = [
+        let raw = MPValue([
             "id": .int(9_000_000_000_003),
             "names": .array([MPValue(["name": .string("Иван Петров"), "type": .string("FULL_NAME")])]),
             "phones": .array([MPValue(["number": .string("+71234567890"), "type": .string("MOBILE")])])
-        ]
+        ])
         let user = try XCTUnwrap(MaxParser.user(from: raw))
         XCTAssertEqual(user.fullName, "Иван Петров")
         XCTAssertEqual(user.phoneNumber, "+71234567890")

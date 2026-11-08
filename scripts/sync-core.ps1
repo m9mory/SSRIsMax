@@ -23,7 +23,8 @@ $files = @(
     'MaxClient/Core/Network/MaxTransport.swift',
     'MaxClient/Core/Network/MaxWebSocketTransport.swift',
     'MaxClient/Core/Network/MaxTCPTransport.swift',
-    'MaxClient/Core/Auth/MaxAuthService.swift'
+    'MaxClient/Core/Auth/MaxAuthService.swift',
+    'MaxClient/Core/Design/PhoneFormatter.swift'
 )
 
 $mirrorOnly = @(

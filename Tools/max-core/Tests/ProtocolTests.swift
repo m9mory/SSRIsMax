@@ -1,4 +1,4 @@
-﻿import Foundation
+import Foundation
 import XCTest
 @testable import MaxCore
 
@@ -22,16 +22,16 @@ final class ProtocolTests: XCTestCase {
     }
 
     func testMessagePackNested() throws {
-        let value: MPValue = [
+        let value = MPValue([
             "chatId": .int(9_000_000_000_004),
-            "message": [
+            "message": MPValue([
                 "text": .string("Привет"),
                 "cid": .int(1_734_567_890_123),
                 "elements": .array([]),
-                "attaches": .array([["_type": .string("PHOTO"), "width": .int(800)]])
-            ],
+                "attaches": .array([MPValue(["_type": .string("PHOTO"), "width": .int(800)])])
+            ]),
             "notify": .bool(true)
-        ]
+        ])
         let decoded = try MPDecoder.decode(MPEncoder.encode(value))
         XCTAssertEqual(decoded, value)
         XCTAssertEqual(decoded["message"]?["text"]?.string, "Привет")
@@ -133,10 +133,15 @@ final class ProtocolTests: XCTestCase {
     }
 
     func testTCPFraming() throws {
-        let frame = MaxFrame(sequence: 5, opcode: MaxOpcode.getChats.rawValue,
+        let frame = MaxFrame(command: 0, sequence: 5, opcode: MaxOpcode.getChats.rawValue,
                              payload: MPValue(["count": .int(10)]))
         let packet = MaxTCPTransport.pack(frame)
-        let length = Int(packet[6]) << 24 | Int(packet[7]) << 16 | Int(packet[8]) << 8 | Int(packet[9])
+        // Заголовок TCP-кадра: 10 байт, длина полезной части в последних 4.
+        let bytes = [UInt8](packet)
+        var length = 0
+        for index in 6...9 {
+            length = (length << 8) | Int(bytes[index])
+        }
         XCTAssertEqual(length, packet.count - 10)
         let payload = try MaxTCPTransport.decodePayload(packet.subdata(in: 10..<packet.count))
         XCTAssertEqual(payload.arrayItems.count, 5)
@@ -189,7 +194,7 @@ final class RequestTests: XCTestCase {
         XCTAssertEqual(chats.last?.type, .chat)
 
         // users() принимает и голый массив, и обёртку — проверяем оба вида.
-        let users = MaxParser.users(from: MPValue([
+        let users = MaxParser.users(from: MPValue.array([
             MPValue(["id": .int(9_000_000_000_003),
                      "names": .array([MPValue(["name": .string("Иван Петров"),
                                                "type": .string("FULL_NAME")])])])

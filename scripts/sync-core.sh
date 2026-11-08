@@ -28,6 +28,7 @@ FILES=(
     "Network/MaxWebSocketTransport.swift"
     "Network/MaxTCPTransport.swift"
     "Auth/MaxAuthService.swift"
+    "Design/PhoneFormatter.swift"
 )
 
 # Файлы, которые существуют только в зеркале (им нечего копировать
