@@ -21,6 +21,10 @@ public final class Session: ObservableObject {
         public var resendAvailableIn: Int = 0
         public var isLoading = false
         public var errorMessage: String?
+        /// Ссылка на страницу VK Captcha, когда сервер её потребовал.
+        /// Пока не `nil`, экран показывает кнопку «Пройти проверку».
+        public var captchaURL: URL?
+        public var isCaptchaPresented = false
     }
 
     @Published public private(set) var phase: Phase = .launching
@@ -135,15 +139,58 @@ public final class Session: ObservableObject {
         auth.phone = phone
 
         do {
-            let verification = try await authService.requestCode(phone: phone, isResend: isResend)
-            auth.pendingToken = verification.token
-            auth.codeLength = verification.codeLength
-            startResendTimer(seconds: Int(verification.requestMaxDuration))
+            try await sendCode(phone: phone, isResend: isResend, captchaToken: nil)
         } catch MaxAuthError.captchaRequired {
-            auth.errorMessage = "Слишком много попыток. Подтвердите, что вы не робот, в браузере, потом вернитесь сюда."
+            // Капчу не обойти: сервер требует её перед отправкой SMS.
+            // Запрашиваем ссылку и показываем экран проверки.
+            await beginCaptcha(phone: phone)
         } catch {
             auth.errorMessage = error.localizedDescription
         }
+    }
+
+    private func sendCode(phone: String, isResend: Bool, captchaToken: String?) async throws {
+        let verification = try await authService.requestCode(phone: phone,
+                                                             isResend: isResend,
+                                                             captchaToken: captchaToken)
+        auth.pendingToken = verification.token
+        auth.codeLength = verification.codeLength
+        startResendTimer(seconds: Int(verification.requestMaxDuration))
+    }
+
+    /// Запрашивает ссылку на капчу и открывает её.
+    private func beginCaptcha(phone: String) async {
+        do {
+            let url = try await authService.requestCaptcha(phone: phone)
+            auth.captchaURL = url
+            auth.isCaptchaPresented = true
+        } catch {
+            auth.errorMessage = "Не удалось начать проверку: \(error.localizedDescription)"
+        }
+    }
+
+    /// Вызывается экраном, когда капча вернула токен.
+    public func completeCaptcha(token: String) async {
+        auth.isCaptchaPresented = false
+        auth.captchaURL = nil
+        auth.errorMessage = nil
+        auth.isLoading = true
+        defer { auth.isLoading = false }
+        do {
+            try await sendCode(phone: auth.phone, isResend: false, captchaToken: token)
+        } catch MaxAuthError.captchaRequired {
+            // Токен не приняли — начинаем проверку заново.
+            await beginCaptcha(phone: auth.phone)
+        } catch {
+            auth.errorMessage = error.localizedDescription
+        }
+    }
+
+    /// Пользователь закрыл капчу, не пройдя её.
+    public func cancelCaptcha() {
+        auth.isCaptchaPresented = false
+        auth.captchaURL = nil
+        auth.errorMessage = "Без проверки сервер не отправит SMS"
     }
 
     /// «Назад» на экране кода: прекращает ввод, номер остаётся в поле.

@@ -54,6 +54,36 @@ public actor MaxAuthService {
 
     // MARK: SMS
 
+    /// CAPTCHA_REQUEST (224): получает ссылку на страницу VK Captcha.
+    ///
+    /// MAX требует капчу перед отправкой SMS, и обойти это нельзя —
+    /// проверка на стороне сервера. Сервер отдаёт `link`, страницу
+    /// открывают в браузере, после прохождения она возвращает
+    /// `captchaToken`, который и передаётся в `requestCode`.
+    public func requestCaptcha(phone: String) async throws -> URL {
+        try await initialize()
+        let frame = MaxFrame(command: 0,
+                             sequence: transport.nextSeq(),
+                             opcode: MaxOpcode.captchaRequest.rawValue,
+                             payload: MaxRequests.captchaRequest(identifier: phone))
+        let response = try await transport.request(frame, timeout: MaxProtocol.requestTimeout)
+        guard let raw = response.payload["link"]?.string,
+              let url = URL(string: raw) else {
+            throw MaxAuthError.unexpected("Сервер не вернул ссылку на капчу")
+        }
+        return url
+    }
+
+    /// Достаёт `captchaToken` из адреса, на который капча перенаправила
+    /// браузер: `...?captcha_token=...` либо `...&token=...`.
+    public static func captchaToken(from url: URL) -> String? {
+        guard let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems else {
+            return nil
+        }
+        let names = ["captcha_token", "captchaToken", "token"]
+        return items.first { names.contains($0.name) }?.value
+    }
+
     /// Отправляет SMS с кодом. `type` — "START_AUTH" или "RESEND".
     public func requestCode(phone: String, isResend: Bool = false, captchaToken: String? = nil) async throws -> PhoneVerification {
         try await initialize()
@@ -76,8 +106,11 @@ public actor MaxAuthService {
                 requestCountLeft: Int(payload["requestCountLeft"]?.int64 ?? 0)
             )
         } catch MaxTransportError.server(_, let code, let message) {
-            if code == "auth.captcha.required" || (message?.contains("captcha") ?? false) {
-                throw MaxAuthError.captchaRequired
+            // Сервер отвечает captcha.validation-failed, если токена нет
+            // или он протух. Отдельной ссылки в этом ответе нет —
+            // её надо запросить через requestCaptcha.
+            if code?.contains("captcha") == true || (message?.lowercased().contains("captcha") ?? false) {
+                throw MaxAuthError.captchaRequired(link: nil)
             }
             throw MaxAuthError.wrongCode(message ?? code ?? "неизвестная ошибка")
         }
@@ -165,7 +198,10 @@ public actor MaxAuthService {
 public enum MaxAuthError: LocalizedError, Equatable {
     case notAuthorized
     case sessionExpired
-    case captchaRequired
+    /// Нужна капча. `link` — адрес страницы VK Captcha, если сервер его
+    /// вернул (opcode 224); `nil`, если сервер потребовал капчу напрямую
+    /// в ответ на VERIFICATION_REQUEST.
+    case captchaRequired(link: String?)
     case wrongCode(String)
     case blocked
     case twoFactorRequired
@@ -175,7 +211,7 @@ public enum MaxAuthError: LocalizedError, Equatable {
         switch self {
         case .notAuthorized: return "Нужно войти в аккаунт"
         case .sessionExpired: return "Сессия истекла — войдите заново"
-        case .captchaRequired: return "Слишком много попыток. Подтвердите, что вы не робот, на сайте VK"
+        case .captchaRequired: return "Нужно подтвердить, что вы не робот"
         case .wrongCode(let message): return message
         case .blocked: return "Аккаунт заблокирован. Восстановление — в официальном клиенте"
         case .twoFactorRequired: return "Аккаунт защищён паролем (2FA). Этот сценарий мы добавим следующим шагом"

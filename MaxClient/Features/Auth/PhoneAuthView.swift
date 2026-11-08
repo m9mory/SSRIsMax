@@ -73,6 +73,11 @@ struct PhoneAuthView: View {
                     .environmentObject(session)
                     .interactiveDismissDisabled()
             }
+            .sheet(isPresented: Binding(get: { session.auth.isCaptchaPresented },
+                                        set: { if !$0 { session.cancelCaptcha() } })) {
+                CaptchaSheet()
+                    .environmentObject(session)
+            }
         }
         .onAppear { focused = true }
     }
@@ -199,6 +204,13 @@ struct CodeEntryView: View {
         }
         .presentationDetents([.large])
         .modifier(ShakeEffect(animatableData: CGFloat(shake ? 1 : 0)))
+        // Повторная отправка кода тоже может потребовать капчу —
+        // показываем её здесь, иначе кнопка молча ничего не сделает.
+        .sheet(isPresented: Binding(get: { session.auth.isCaptchaPresented },
+                                    set: { if !$0 { session.cancelCaptcha() } })) {
+            CaptchaSheet()
+                .environmentObject(session)
+        }
     }
 
     private var codeField: some View {

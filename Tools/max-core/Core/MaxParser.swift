@@ -250,6 +250,16 @@ public enum MaxParser {
 // MARK: - Сборка запросов
 
 public enum MaxRequests {
+    /// Данные клиента для INIT.
+    ///
+    /// `deviceType` ОБЯЗАН быть "WEB". Сервер MAX проверяет это поле по
+    /// белому списку и на всё остальное закрывает соединение кадром
+    /// close с причиной `deviceType forbidden` — именно так выглядела
+    /// ошибка «Соединение закрыто: …» при входе. Мобильные типы (`IOS`,
+    /// `ANDROID`) принимаются только от клиентов с валидной подписью
+    /// приложения, которую сторонняя сборка предоставить не может.
+    /// JSON-эндпоинт и так рассчитан на веб-клиент, так что это
+    /// соответствует протоколу.
     public struct UserAgent: Sendable {
         public var deviceType: String
         public var pushDeviceType: String
@@ -259,15 +269,20 @@ public enum MaxRequests {
         public var appVersion: String
         public var timezone: String
         public var screen: String
+        /// Должен согласовываться с `deviceType`: сервер сверяет эти
+        /// поля, и строка «MaxClient (iOS)» при `deviceType: WEB`
+        /// выглядит как подделка. Отправляем обычный браузерный UA.
+        public var headerUserAgent: String
 
-        public init(deviceType: String = "IOS",
-                    pushDeviceType: String = "APNS",
+        public init(deviceType: String = "WEB",
+                    pushDeviceType: String = "WEBPUSH",
                     locale: String = "ru",
-                    osVersion: String = "iOS",
-                    deviceName: String = "iPhone",
+                    osVersion: String = "macOS",
+                    deviceName: String = "SSRIsMax",
                     appVersion: String = MaxProtocol.appVersion,
                     timezone: String = TimeZone.current.identifier,
-                    screen: String = "390x844 3.0x") {
+                    screen: String = "390x844 3.0x",
+                    headerUserAgent: String = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1") {
             self.deviceType = deviceType
             self.pushDeviceType = pushDeviceType
             self.locale = locale
@@ -276,6 +291,7 @@ public enum MaxRequests {
             self.appVersion = appVersion
             self.timezone = timezone
             self.screen = screen
+            self.headerUserAgent = headerUserAgent
         }
 
         public var payload: MPValue {
@@ -286,7 +302,7 @@ public enum MaxRequests {
                 "deviceLocale": .string(locale),
                 "osVersion": .string(osVersion),
                 "deviceName": .string(deviceName),
-                "headerUserAgent": .string("MaxClient/\(appVersion) (iOS)"),
+                "headerUserAgent": .string(headerUserAgent),
                 "appVersion": .string(appVersion),
                 "screen": .string(screen),
                 "timezone": .string(timezone)
@@ -296,6 +312,17 @@ public enum MaxRequests {
 
     public static func initSession(deviceID: String, userAgent: UserAgent) -> MPValue {
         MPValue(["deviceId": .string(deviceID), "userAgent": userAgent.payload])
+    }
+
+    /// CAPTCHA_REQUEST (224) — просим у сервера ссылку на VK Captcha.
+    ///
+    /// Ответ содержит `link`: его открывают в браузере, проходят проверку
+    /// и забирают `captchaToken`, который затем идёт в VERIFICATION_REQUEST.
+    public static func captchaRequest(identifier: String) -> MPValue {
+        MPValue([
+            "source": .string("auth"),
+            "identifier": .string(identifier)
+        ])
     }
 
     public static func requestCode(phone: String, type: String = "START_AUTH", captchaToken: String? = nil) -> MPValue {

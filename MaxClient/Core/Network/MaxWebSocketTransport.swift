@@ -161,7 +161,13 @@ public final class MaxWebSocketTransport: MaxTransporting, @unchecked Sendable {
             switch result {
             case .success(let message):
                 self.handle(message)
-                if self.isOpen { self.receiveLoop(task) }
+                // isOpen читаем под замком: его меняет handleDisconnect
+                // из другого потока, и без синхронизации цикл мог
+                // остановиться навсегда после гонки.
+                self.lock.lock()
+                let stillOpen = self.isOpen
+                self.lock.unlock()
+                if stillOpen { self.receiveLoop(task) }
             case .failure(let error):
                 self.handleDisconnect(error)
             }
