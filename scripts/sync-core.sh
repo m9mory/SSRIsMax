@@ -5,9 +5,9 @@
 # файлы, не зависящие от SwiftUI, UIKit, GRDB и Security. Зеркало не
 # редактируйте: правки будут перезаписаны.
 #
-# MaxMemoryCredentialStore.swift (протокол MaxCredentialStore) живёт ТОЛЬКО
-# в зеркале: приложение использует KeychainCredentialStore из
-# MaxClient/Core/Storage, и копировать протокол туда нельзя — будет дубль.
+# CredentialStoreProtocol.swift копируется: он без Security, и протокол
+# MaxCredentialStore должен быть виден и приложению, и CLI.
+# MaxMemoryCredentialStore.swift — ТОЛЬКО в зеркале (in-memory класс для тестов).
 #
 # Использование:
 #   scripts/sync-core.sh            # скопировать
@@ -29,6 +29,7 @@ FILES=(
     "Network/MaxTCPTransport.swift"
     "Auth/MaxAuthService.swift"
     "Design/PhoneFormatter.swift"
+    "Storage/CredentialStoreProtocol.swift"
 )
 
 # Файлы, которые существуют только в зеркале (им нечего копировать
@@ -64,14 +65,23 @@ if [[ $verify -eq 1 ]]; then
     exit 0
 fi
 
-rm -rf "$DST"
 mkdir -p "$DST"
+
+# Удаляем только управляемые файлы. Прежний `rm -rf "$DST"` стирал и
+# MIRROR_ONLY, после чего проверка ниже всегда падала.
+for f in "${FILES[@]}"; do
+    rm -f "$DST/$(basename "$f")"
+done
+
 for f in "${FILES[@]}"; do
     cp "$SRC/$f" "$DST/$(basename "$f")"
 done
+
+# MIRROR_ONLY не трогаем — они уже на месте; проверяем, что не пропали.
 for f in "${MIRROR_ONLY[@]}"; do
     if [[ ! -f "$DST/$f" ]]; then
-        echo "ОШИБКА: $DST/$f пропал при очистке каталога" >&2
+        echo "ОШИБКА: $DST/$f отсутствует" >&2
+        echo "Восстановите его из git: git checkout -- $DST/$f" >&2
         exit 1
     fi
 done

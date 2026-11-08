@@ -2,9 +2,9 @@
 #
 # MaxClient/Core is the single source of truth. The mirror exists only so
 # `swift run` on macOS/Linux can build the core without GRDB, UIKit or Security.
-# MaxMemoryCredentialStore.swift (protocol MaxCredentialStore) is mirror-only:
-# the app uses KeychainCredentialStore from MaxClient/Core/Storage, so copying
-# the protocol there would duplicate the declaration.
+# CredentialStoreProtocol.swift IS mirrored (no Security dependency) so the
+# protocol is visible in both places; MaxMemoryCredentialStore.swift is
+# mirror-only and holds just the in-memory class.
 #
 # Usage:  pwsh -File scripts/sync-core.ps1
 #         pwsh -File scripts/sync-core.ps1 -Verify
@@ -24,7 +24,8 @@ $files = @(
     'MaxClient/Core/Network/MaxWebSocketTransport.swift',
     'MaxClient/Core/Network/MaxTCPTransport.swift',
     'MaxClient/Core/Auth/MaxAuthService.swift',
-    'MaxClient/Core/Design/PhoneFormatter.swift'
+    'MaxClient/Core/Design/PhoneFormatter.swift',
+    'MaxClient/Core/Storage/CredentialStoreProtocol.swift'
 )
 
 $mirrorOnly = @(

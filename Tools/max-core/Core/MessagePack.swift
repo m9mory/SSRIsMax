@@ -442,12 +442,12 @@ public extension MPValue {
         self = .double(number.doubleValue)
     }
 
-    public subscript(key: String) -> MPValue? {
+    subscript(key: String) -> MPValue? {
         if case .map(let map) = self { return map[MPMapKey(key)] }
         return nil
     }
 
-    public var string: String? {
+    var string: String? {
         switch self {
         case .string(let s): return s
         case .int(let i): return String(i)
@@ -455,7 +455,7 @@ public extension MPValue {
         }
     }
 
-    public var int64: Int64? {
+    var int64: Int64? {
         switch self {
         case .int(let i): return i
         case .double(let d): return Int64(exactly: d.rounded())
@@ -464,7 +464,7 @@ public extension MPValue {
         }
     }
 
-    public var double: Double? {
+    var double: Double? {
         switch self {
         case .double(let d): return d
         case .int(let i): return Double(i)
@@ -473,30 +473,30 @@ public extension MPValue {
         }
     }
 
-    public var bool: Bool? {
+    var bool: Bool? {
         if case .bool(let b) = self { return b }
         if let i = int64 { return i != 0 }
         return nil
     }
 
-    public var arrayItems: [MPValue] {
+    var arrayItems: [MPValue] {
         if case .array(let items) = self { return items }
         return []
     }
 
-    public var mapEntries: [MPMapKey: MPValue] {
+    var mapEntries: [MPMapKey: MPValue] {
         if case .map(let map) = self { return map }
         return [:]
     }
 
-    public var data: Data? {
+    var data: Data? {
         if case .binary(let d) = self { return d }
         if case .string(let s) = self { return Data(s.utf8) }
         return nil
     }
 
     /// Обратное преобразование для отладки и для JS-подобного API.
-    public var foundation: Any {
+    var foundation: Any {
         switch self {
         case .null: return NSNull()
         case .bool(let b): return b

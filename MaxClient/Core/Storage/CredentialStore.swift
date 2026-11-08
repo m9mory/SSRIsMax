@@ -5,10 +5,9 @@ import Security
 ///
 /// Токен и deviceId — секреты: Keychain. Настройки — UserDefaults.
 ///
-/// Протокол `MaxCredentialStore` объявлен в ядре
-/// (`Tools/max-core/Core/MaxMemoryCredentialStore.swift`): он нужен
-/// CLI-сборке, где нет Security.framework. Файл ядра намеренно НЕ
-/// копируется в приложение, чтобы не дублировать декларацию.
+/// Протокол `MaxCredentialStore` объявлен в `CredentialStoreProtocol.swift`:
+/// этот файл тянет Security.framework и в зеркало ядра не копируется,
+/// а протокол должен быть доступен и приложению, и CLI.
 public final class KeychainCredentialStore: MaxCredentialStore, @unchecked Sendable {
     private let keychain = KeychainService(service: "ru.maxclient.app.session")
     private let defaults: UserDefaults
