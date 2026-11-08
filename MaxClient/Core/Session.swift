@@ -193,6 +193,13 @@ public final class Session: ObservableObject {
         auth.errorMessage = "Без проверки сервер не отправит SMS"
     }
 
+    /// Страница проверки так и не отдала токен.
+    public func captchaTimedOut() {
+        auth.isCaptchaPresented = false
+        auth.captchaURL = nil
+        auth.errorMessage = "Проверка не завершилась. Попробуйте ещё раз"
+    }
+
     /// «Назад» на экране кода: прекращает ввод, номер остаётся в поле.
     public func cancelCodeEntry() {
         resendTask?.cancel()

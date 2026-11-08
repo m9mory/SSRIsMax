@@ -11,15 +11,21 @@ import WebKit
 /// приложении, а `captchaToken`, который она получает после решения,
 /// подхватывается автоматически и уходит в VERIFICATION_REQUEST.
 ///
-/// Страница `id.vk.ru/not_robot_captcha` — JS-приложение без серверного
-/// редиректа, поэтому токен вычитывается опросом (адрес, хранилища,
-/// известные глобальные переменные), а не одним перехватом навигации.
+/// Страница `id.vk.ru/not_robot_captcha` — это JS-приложение
+/// (VK Captcha), которое встраивает виджет в iframe. После галочки
+/// виджет отправляет родительскому окну сообщение
+/// `{type: "vk-sak-sdk", handler: "VKCaptchaGetResult", params: {token}}`.
+/// В адресе и в хранилищах токена нет — страница отдаёт его только этим
+/// сообщением и сразу использует, нигде не сохраняя. Поэтому мы ставим
+/// свой слушатель `message` и складываем токен в
+/// `window.__ssrismaxCaptchaToken`, откуда его и забирает опрос.
 struct CaptchaWebView: UIViewRepresentable {
     let url: URL
     let onToken: (String) -> Void
+    let onTimeout: () -> Void
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(onToken: onToken)
+        Coordinator(onToken: onToken, onTimeout: onTimeout)
     }
 
     func makeUIView(context: Context) -> WKWebView {
@@ -28,6 +34,74 @@ struct CaptchaWebView: UIViewRepresentable {
         // проверка не завершится.
         configuration.websiteDataStore = .default()
         configuration.defaultWebpagePreferences.allowsContentJavaScript = true
+
+        // Виджет отдаёт токен только сообщением в родительское окно —
+        // в адресе и хранилищах его нет. Слушателя ставим на каждый
+        // документ, чтобы он существовал до того, как пользователь
+        // поставит галочку.
+        let bridge = """
+        (function () {
+          if (window.__ssrismaxCaptchaHook) { return; }
+          window.__ssrismaxCaptchaHook = true;
+          window.__ssrismaxCaptchaToken = null;
+
+          function grab(data) {
+            try {
+              if (!data || data.type !== 'vk-sak-sdk') { return; }
+              var params = data.params || {};
+              var token = params.token || params.value;
+              if (data.handler === 'VKCaptchaGetResult' && token) {
+                window.__ssrismaxCaptchaToken = String(token);
+              }
+            } catch (err) {}
+          }
+
+          // 1) Сообщения виджета (если VK вернётся к схеме с iframe).
+          window.addEventListener('message', function (e) { grab(e && e.data); }, true);
+
+          // 2) Главный путь: токен приходит в ответе на проверку капчи.
+          //    Перехватываем fetch и XHR и вытаскиваем токен из тела.
+          function scan(text) {
+            try {
+              if (!text) { return; }
+              // Проверка на подстроку «токен» регистронезависима:
+              // в camelCase-виде (captchaToken) нижнего «token» нет,
+              // и жадный предфильтр отбрасывал бы верный ответ.
+              var lower = String(text).toLowerCase();
+              if (lower.indexOf('token') < 0) { return; }
+              var re = /"(?:captcha_?[Tt]oken|token)"\s*:\s*"([^"]{8,})"/;
+              var m = text.match(re);
+              if (m) { window.__ssrismaxCaptchaToken = m[1]; }
+            } catch (err) {}
+          }
+
+          var rawFetch = window.fetch;
+          if (rawFetch) {
+            window.fetch = function () {
+              return rawFetch.apply(this, arguments).then(function (resp) {
+                try {
+                  resp.clone().text().then(scan, function () {});
+                } catch (err) {}
+                return resp;
+              });
+            };
+          }
+
+          var rawSend = XMLHttpRequest.prototype.send;
+          XMLHttpRequest.prototype.send = function () {
+            var xhr = this;
+            xhr.addEventListener('load', function () {
+              try { scan(xhr.responseText); } catch (err) {}
+            });
+            return rawSend.apply(this, arguments);
+          };
+        })();
+        """
+        configuration.userContentController.addUserScript(
+            WKUserScript(source: bridge,
+                         injectionTime: .atDocumentStart,
+                         forMainFrameOnly: false)
+        )
 
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = context.coordinator
@@ -44,11 +118,13 @@ struct CaptchaWebView: UIViewRepresentable {
     @MainActor
     final class Coordinator: NSObject, WKNavigationDelegate {
         private let onToken: (String) -> Void
+        private let onTimeout: () -> Void
         private var finished = false
         private var pollTask: Task<Void, Never>?
 
-        init(onToken: @escaping (String) -> Void) {
+        init(onToken: @escaping (String) -> Void, onTimeout: @escaping () -> Void) {
             self.onToken = onToken
+            self.onTimeout = onTimeout
         }
 
         deinit {
@@ -80,22 +156,39 @@ struct CaptchaWebView: UIViewRepresentable {
         private func startPolling(_ webView: WKWebView) {
             pollTask?.cancel()
             pollTask = Task { [weak self] in
+                // ~30 с: если токена так и нет, лучше честно сказать,
+                // что страница не отдала результат, чем держать пустое
+                // окно. Пользователь хотя бы узнает, что делать дальше.
+                let deadline = Date().addingTimeInterval(30)
                 while !Task.isCancelled {
-                    try? await Task.sleep(nanoseconds: 700_000_000)
+                    try? await Task.sleep(nanoseconds: 500_000_000)
                     guard let self, !self.finished else { return }
                     if let token = await self.readToken(from: webView), !token.isEmpty {
                         self.finish(token)
+                        return
+                    }
+                    if Date() > deadline {
+                        self.onTimeout()
                         return
                     }
                 }
             }
         }
 
-        /// Ищет токен в известных местах, куда его кладёт страница VK.
+        /// Ищет токен, который страница получает после решения капчи.
+        ///
+        /// Надёжного места, куда VK его кладёт, нет: в отданном документе
+        /// нет ни `callback`, ни `success_url`, ни iframe — только
+        /// скрипт антибот-проверки, а токен живёт в памяти его JS.
+        /// Поэтому проверяем всё, что может появиться: сохранённое
+        /// перехваченное сообщение, адрес, хранилища.
         private func readToken(from webView: WKWebView) async -> String? {
             let script = """
             (function () {
               try {
+                if (window.__ssrismaxCaptchaToken) {
+                  return String(window.__ssrismaxCaptchaToken);
+                }
                 var href = (location.href || '');
                 var m = href.match(/[?&](captcha_token|captchaToken|token)=([^&#]+)/);
                 if (m) { return decodeURIComponent(m[2]); }
@@ -105,7 +198,6 @@ struct CaptchaWebView: UIViewRepresentable {
                   var v = (store && store.getItem(keys[i])) || (sess && sess.getItem(keys[i]));
                   if (v) { return v; }
                 }
-                if (window.__captchaToken) { return window.__captchaToken; }
               } catch (e) {}
               return null;
             })();
@@ -136,9 +228,13 @@ struct CaptchaSheet: View {
         NavigationStack {
             Group {
                 if let url = session.auth.captchaURL {
-                    CaptchaWebView(url: url) { token in
-                        Task { await session.completeCaptcha(token: token) }
-                    }
+                    CaptchaWebView(url: url,
+                                   onToken: { token in
+                                       Task { await session.completeCaptcha(token: token) }
+                                   },
+                                   onTimeout: {
+                                       session.captchaTimedOut()
+                                   })
                     .ignoresSafeArea(edges: .bottom)
                 } else {
                     ProgressView("Готовим проверку…")
