@@ -73,6 +73,7 @@ Workflow `.github/workflows/ci.yml` на каждый push/PR:
 | `simctl` не находит устройство | на раннере сменилось имя iPhone — используйте выбор по UDID из workflow |
 | `Unable to boot simulator` | повторить запуск; на macOS-раннере симуляторы иногда заняты |
 | Тесты падают в `RepositoryTests` | миграции разошлись с `Repositories.swift` |
+| Запуск падает за 0 секунд, джоб нет | Actions заблокированы или квота нулевая: [CI-TROUBLESHOOTING.md](CI-TROUBLESHOOTING.md) |
 
 ## Тесты
 
