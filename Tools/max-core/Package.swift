@@ -8,7 +8,7 @@ import PackageDescription
 // Core/ — зеркало MaxClient/Core, обновляется скриптом scripts/sync-core.sh.
 //
 // Источники перечислены явно: `sources: ["Core", "main.swift"]`.
-// Раньше здесь было `path: "."` + `exclude: ["core-kit"]`, и SwiftPM
+// Раньше здесь было только `path: "."` + `exclude: ["core-kit"]`, и SwiftPM
 // не включал `Core/` в таргет — файлы ядра не компилировались, а
 // `main.swift` ссылался на несуществующие типы (ошибки вида
 // «cannot find 'nowMillis' in scope» и «MPValue has no accessible
@@ -24,7 +24,8 @@ let package = Package(
         .executableTarget(
             name: "max-core",
             path: ".",
-            sources: ["Core", "main.swift"]
+            sources: ["Core", "main.swift"],
+            exclude: ["core-kit"]
         )
     ]
 )

@@ -305,7 +305,7 @@ public enum MaxRequests {
         ])
     }
 
-    public static func chats(count: Int = 100, marker: UnixMillis = nowMillis()) -> MPValue {
+    public static func chats(count: Int = 100, marker: UnixMillis = MaxParser.nowMillis()) -> MPValue {
         MPValue(["count": .int(Int64(count)), "marker": .int(marker)])
     }
 

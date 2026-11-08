@@ -126,7 +126,7 @@ public final class MaxWebSocketTransport: MaxTransporting, @unchecked Sendable {
                 Task { try? await self.send(frame: MaxFrame(command: 0,
                                                             sequence: seq,
                                                             opcode: MaxOpcode.ping.rawValue,
-                                                            payload: MPValue(["interactive": .bool(true)])) }
+                                                            payload: MPValue(["interactive": .bool(true)]))) }
             }
             onEvent?(event)
         }
