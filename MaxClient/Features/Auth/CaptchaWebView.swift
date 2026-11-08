@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 import WebKit
 
@@ -48,14 +49,29 @@ struct CaptchaWebView: UIViewRepresentable {
 
           function grab(data) {
             try {
+              // Диагностика: пишем в журнал всё, что похоже на ответ
+              // капчи, чтобы на экране было видно, доходит ли сообщение
+              // и в каком оно виде.
+              if (!data || typeof data !== 'object') { return; }
+              var body = data.message || data;
+              var handler = body && body.handler;
+              if (handler) {
+                window.__ssrismaxCaptchaLog = (window.__ssrismaxCaptchaLog || '');
+                var brief = String(handler);
+                try {
+                  var pr = body.params || {};
+                  if (pr.token) { brief += ' token=' + String(pr.token).slice(0, 12) + '…'; }
+                  else { brief += ' keys=' + Object.keys(pr).join(','); }
+                } catch (e2) {}
+                window.__ssrismaxCaptchaLog = (brief + "\\n" + window.__ssrismaxCaptchaLog).slice(0, 600);
+                window.__ssrismaxCaptchaSeen = (window.__ssrismaxCaptchaSeen || 0) + 1;
+              }
               if (!data || data.type !== 'vk-sak-sdk') { return; }
               // Сообщение уходит как `{...t, type: "vk-sak-sdk"}`, где
               // t — это `{message: {handler, params}}`. То есть handler
               // и params лежат НА УРОВНЕ data.message, а не на верхнем.
               // Плоский вариант оставляем как запасной на случай другой
               // версии SDK.
-              var body = data.message || data;
-              var handler = body.handler || data.handler;
               var params = body.params || data.params || {};
               var token = params.token || params.value;
               if (handler === 'VKCaptchaGetResult' && token) {
@@ -64,8 +80,28 @@ struct CaptchaWebView: UIViewRepresentable {
             } catch (err) {}
           }
 
-          // 1) Сообщения виджета (если VK вернётся к схеме с iframe).
+          // 1) Сообщения виджета. Слушаем в capture-фазе, чтобы видеть
+          //    событие раньше обработчиков страницы.
           window.addEventListener('message', function (e) { grab(e && e.data); }, true);
+
+          // Диагностическая панель: показывает, доходят ли сообщения и в
+          // каком они виде. Без неё причину «окно висит» не увидеть.
+          window.__ssrismaxShowDebug = function (text) {
+            try {
+              var id = '__ssrismax_debug';
+              var el = document.getElementById(id);
+              if (!el) {
+                el = document.createElement('div');
+                el.id = id;
+                el.style.cssText = 'position:fixed;left:0;right:0;bottom:0;' +
+                  'max-height:40%;overflow:auto;z-index:2147483647;' +
+                  'background:rgba(0,0,0,.88);color:#0f0;font:11px/1.35 monospace;' +
+                  'padding:6px;white-space:pre-wrap;pointer-events:none';
+                (document.body || document.documentElement).appendChild(el);
+              }
+              el.textContent = text;
+            } catch (err) {}
+          };
 
           // 2) Главный путь: токен приходит в ответе на проверку капчи.
           //    Перехватываем fetch и XHR и вытаскиваем токен из тела.
@@ -179,10 +215,43 @@ struct CaptchaWebView: UIViewRepresentable {
                         self.finish(token)
                         return
                     }
+                    // Обновляем панель: видно, доходят ли сообщения.
+                    let log = await self.readLog(from: webView)
+                    await self.updateDebugPanel(webView, text: log)
                     if Date() > deadline {
                         self.onTimeout()
                         return
                     }
+                }
+            }
+        }
+
+        private func updateDebugPanel(_ webView: WKWebView, text: String) async {
+            // Экранируем строку как JSON, чтобы она дошла без поломок.
+            guard let data = try? JSONSerialization.data(withJSONObject: [text]),
+                  let json = String(data: data, encoding: .utf8) else { return }
+            let escaped = String(json.dropFirst().dropLast())
+            let script = "window.__ssrismaxShowDebug && window.__ssrismaxShowDebug(\(escaped));"
+            _ = try? await webView.evaluateJavaScript(script)
+        }
+
+        /// Читает диагностический журнал: какие сообщения долетели.
+        private func readLog(from webView: WKWebView) async -> String {
+            let script = """
+            (function () {
+              if (window.__ssrismaxCaptchaToken) { return 'TOKEN'; }
+              if (window.__ssrismaxCaptchaHook) {
+                var seen = window.__ssrismaxCaptchaSeen || 0;
+                var log = window.__ssrismaxCaptchaLog || '';
+                if (seen > 0) { return 'seen=' + seen + '\\n' + log; }
+                return 'hook=on, сообщений нет';
+              }
+              return 'hook НЕ установлен';
+            })();
+            """
+            return await withCheckedContinuation { continuation in
+                webView.evaluateJavaScript(script) { value, _ in
+                    continuation.resume(returning: (value as? String) ?? "нет ответа")
                 }
             }
         }
