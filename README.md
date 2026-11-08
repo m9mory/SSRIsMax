@@ -29,8 +29,7 @@ MaxClient/
 └── Resources/                Info.plist, Assets.xcassets (иконка, цвет запуска)
 
 Tests/CoreTests.swift         XCTest: кодек, кадры, парсеры, репозитории
-Tools/max-core/               SwiftPM-CLI для проверки протокола без iPhone
-Tools/max-core/core-kit/      SwiftPM-пакет с офлайн-тестами ядра (для CI)
+Tools/max-core/               SwiftPM-пакет: CLI и офлайн-тесты ядра (для CI)
 .github/workflows/ci.yml      сборка и тесты на macOS-раннере
 docs/                         заметки по протоколу, сборке, миграциям
 scripts/                      синхронизация ядра в CLI, упаковка .ipa

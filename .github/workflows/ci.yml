@@ -37,7 +37,6 @@ jobs:
         with:
           path: |
             Tools/max-core/.build
-            Tools/max-core/core-kit/.build
           key: spm-${{ runner.os }}-${{ hashFiles('Tools/max-core/**') }}
           restore-keys: spm-${{ runner.os }}-
 
@@ -46,7 +45,7 @@ jobs:
         run: swift build
 
       - name: Офлайн-тесты протокола
-        working-directory: Tools/max-core/core-kit
+        working-directory: Tools/max-core
         run: swift test
 
   # ---------------------------------------------------------------------------

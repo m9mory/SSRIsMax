@@ -1,4 +1,5 @@
 import Foundation
+import MaxCore
 
 /// CLI-харнесс ядра MAX-клиента.
 ///

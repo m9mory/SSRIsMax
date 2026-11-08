@@ -77,7 +77,7 @@ Workflow `.github/workflows/ci.yml` на каждый push/PR:
 
 ## Тесты
 
-- **`core`** (SwiftPM, `Tools/max-core/core-kit`) — протокол без iOS:
+- **`core`** (SwiftPM, `Tools/max-core`) — протокол без iOS:
   MessagePack, JSON/бинарные кадры, парсеры, события.
 - **`MaxCoreTests`** (XCTest в Xcode/CI) — то же плюс форматирование
   телефона и локальная база GRDB в памяти.
